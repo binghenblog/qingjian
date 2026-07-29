@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { useTodoStore } from '@/stores/todos'
+import { useTodoStore, dateKey } from '@/stores/todos'
 import TodoBadges from '@/components/TodoBadges.vue'
+import { DAILY_CATEGORY } from '@/types'
 
 const router = useRouter()
 const store = useTodoStore()
@@ -20,7 +21,7 @@ const greeting = computed(() => {
   return '晚上好'
 })
 
-/** 今日待办：未完成，按优先级排序，最多 6 条 */
+/** 今日待办：未完成（每日任务按今天判定、优先展示），最多 6 条 */
 const topPending = computed(() => store.pending.slice(0, 6))
 
 /** 统计数据 */
@@ -28,32 +29,28 @@ const total = computed(() => store.todos.length)
 const done = computed(() => store.doneCount)
 const completionRate = computed(() => (total.value ? Math.round((done.value / total.value) * 100) : 0))
 
-/** 本周完成数 */
-const weekDone = computed(() => {
-  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
-  return store.todos.filter((t) => t.done && t.createdAt > weekAgo).length
-})
-
 /** 今日新增 */
 const todayAdded = computed(() => {
   const start = new Date().setHours(0, 0, 0, 0)
   return store.todos.filter((t) => t.createdAt >= start).length
 })
 
-/** 本周每日完成数（周日到周六） */
+/** 本周每日完成数（周日到周六，按实际完成日期统计） */
 const weekBars = computed(() => {
-  const bars: number[] = new Array(7).fill(0)
   const now = new Date()
   const base = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const startOfWeek = base.getTime() - base.getDay() * 24 * 60 * 60 * 1000
-  store.todos.forEach((t) => {
-    if (!t.done) return
-    const dayIdx = Math.floor((t.createdAt - startOfWeek) / (24 * 60 * 60 * 1000))
-    if (dayIdx >= 0 && dayIdx < 7) bars[dayIdx]++
-  })
+  const bars: number[] = []
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(startOfWeek + i * 24 * 60 * 60 * 1000)
+    bars.push(store.completedCountOn(dateKey(d)))
+  }
   const max = Math.max(1, ...bars)
   return bars.map((count) => ({ count, height: `${Math.round((count / max) * 100)}%` }))
 })
+
+/** 本周完成总数 */
+const weekDone = computed(() => weekBars.value.reduce((s, b) => s + b.count, 0))
 
 const weekLabels = ['日', '一', '二', '三', '四', '五', '六']
 
@@ -119,6 +116,9 @@ function addProgress() {
             <span v-if="total" class="text-xs text-fg-faint">
               {{ done }} / {{ total }} 已完成
             </span>
+            <span v-if="store.yesterdayMissed > 0" class="missed-chip text-[11px] px-2 py-0.5 rounded-full">
+              昨日遗留 {{ store.yesterdayMissed }} 项
+            </span>
           </div>
           <button
             @click="router.push('/todos')"
@@ -138,11 +138,17 @@ function addProgress() {
             <button
               @click="store.toggle(t.id)"
               class="check w-5 h-5 rounded-full flex items-center justify-center shrink-0 cursor-pointer"
-              :class="{ 'check-done': t.done }"
+              :class="{ 'check-done': store.isDone(t) }"
             >
-              <span v-if="t.done" class="i-carbon-checkmark text-[13px] leading-none text-white" />
+              <span v-if="store.isDone(t)" class="i-carbon-checkmark text-[13px] leading-none text-white" />
             </button>
             <span class="flex-1 text-sm truncate">{{ t.title }}</span>
+            <span
+              class="cat-chip text-[11px] px-2 py-0.5 rounded-full shrink-0"
+              :class="t.category === DAILY_CATEGORY ? 'cat-daily' : ''"
+            >
+              {{ t.category }}
+            </span>
             <TodoBadges :priority="t.priority" :tag="t.tag" />
           </li>
         </TransitionGroup>
@@ -279,6 +285,28 @@ function addProgress() {
 }
 
 .empty { border: 1.5px dashed var(--c-border); }
+
+/* 分类芯片 */
+.cat-chip {
+  background: var(--c-bg);
+  color: var(--c-fg-faint);
+  border: 1px solid var(--c-border);
+  font-weight: 500;
+}
+.cat-daily {
+  background: var(--c-brand-soft);
+  color: var(--c-brand-strong);
+  border-color: transparent;
+}
+.dark .cat-daily { color: var(--c-brand); }
+
+/* 昨日遗留提示芯片（琥珀色突出） */
+.missed-chip {
+  background: #f59e0b1a;
+  color: #d97706;
+  font-weight: 600;
+}
+.dark .missed-chip { background: #f59e0b26; color: #fbbf24; }
 
 .stat-cell {
   background: var(--c-bg);
