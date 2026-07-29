@@ -1,21 +1,18 @@
 import Dexie, { type Table } from 'dexie'
+import type { NoteRecord } from '@/types'
 
-export interface NoteRecord {
-  id: string
-  title: string
-  content: string
-  tags: string[]
-  /** 所属文件夹名；空字符串 = 未分类 */
-  folder: string
-  createdAt: number
-  updatedAt: number
-}
+// 类型集中在 src/types.ts（审查 M-12）；此处转发导出保持旧引用兼容
+export type { NoteRecord }
 
 export interface StorageAdapter {
   listNotes(): Promise<NoteRecord[]>
   getNote(id: string): Promise<NoteRecord | undefined>
   saveNote(n: NoteRecord): Promise<void>
+  /** 批量保存（单事务） */
+  saveNotes(list: NoteRecord[]): Promise<void>
   deleteNote(id: string): Promise<void>
+  /** 原子化整体替换：清空 + 写入在同一事务内完成，失败自动回滚（备份导入用） */
+  replaceAllNotes(list: NoteRecord[]): Promise<void>
 }
 
 /**
@@ -62,8 +59,19 @@ class DexieStorage implements StorageAdapter {
   async saveNote(n: NoteRecord): Promise<void> {
     await db.notes.put(n)
   }
+  async saveNotes(list: NoteRecord[]): Promise<void> {
+    if (list.length === 0) return
+    await db.notes.bulkPut(list)
+  }
   async deleteNote(id: string): Promise<void> {
     await db.notes.delete(id)
+  }
+  async replaceAllNotes(list: NoteRecord[]): Promise<void> {
+    // Dexie 事务：clear + bulkPut 原子执行，任一步失败整体回滚（审查 H-5）
+    await db.transaction('rw', db.notes, async () => {
+      await db.notes.clear()
+      if (list.length > 0) await db.notes.bulkPut(list)
+    })
   }
 }
 

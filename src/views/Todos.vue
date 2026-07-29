@@ -237,9 +237,9 @@ function isPreset(cat: string) {
           {{ t.title }}
         </span>
         <!-- 每日任务连续打卡 -->
-        <span v-if="isDaily && store.streak(t) > 1" class="streak flex items-center gap-0.5 text-[11px] shrink-0">
+        <span v-if="isDaily && (store.streaks[t.id] ?? 0) > 1" class="streak flex items-center gap-0.5 text-[11px] shrink-0">
           <span class="i-carbon-fire text-xs" />
-          {{ store.streak(t) }}天
+          {{ store.streaks[t.id] }}天
         </span>
         <TodoBadges :priority="t.priority" :tag="t.tag" />
         <button

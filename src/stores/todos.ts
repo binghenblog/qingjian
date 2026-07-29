@@ -11,6 +11,35 @@ import { DAILY_CATEGORY } from '@/types'
  */
 const STORAGE_KEY = 'qingjian.todos'
 const CATEGORY_KEY = 'qingjian.todo-categories'
+const VERSION_KEY = 'qingjian.todos-version'
+
+/** 当前待办数据结构版本（审查 H-6：版本化迁移，替代无版本的内联兜底） */
+export const TODOS_VERSION = 2
+
+/**
+ * 逐版本迁移链：schema 每次变更就追加一个 from→from+1 的迁移函数。
+ * v1 → v2：补 category（历史任务归「生活」）、每日任务补 doneDates
+ */
+const MIGRATIONS: Record<number, (list: TodoRecord[]) => TodoRecord[]> = {
+  1: (list) =>
+    list.map((t) => ({
+      ...t,
+      category: t.category || '生活',
+      doneDates:
+        (t.category || '生活') === DAILY_CATEGORY && !Array.isArray(t.doneDates)
+          ? []
+          : t.doneDates
+    }))
+}
+
+function migrateTodos(list: TodoRecord[], fromVersion: number): TodoRecord[] {
+  let cur = list
+  for (let v = fromVersion; v < TODOS_VERSION; v++) {
+    const step = MIGRATIONS[v]
+    if (step) cur = step(cur)
+  }
+  return cur
+}
 
 export const PRESET_CATEGORIES = [DAILY_CATEGORY, '生活', '工作', '学习', '游戏']
 
@@ -33,13 +62,18 @@ export function yesterdayKey(): string {
 function loadTodos(): TodoRecord[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    const list = raw ? (JSON.parse(raw) as TodoRecord[]) : []
-    // 迁移旧数据：无 category 的历史任务归入「生活」
-    for (const t of list) {
-      if (!t.category) t.category = '生活'
-      if (t.category === DAILY_CATEGORY && !t.doneDates) t.doneDates = []
+    if (!raw) {
+      localStorage.setItem(VERSION_KEY, String(TODOS_VERSION))
+      return []
     }
-    return list
+    const list = JSON.parse(raw) as TodoRecord[]
+    if (!Array.isArray(list)) return []
+    const stored = Number(localStorage.getItem(VERSION_KEY)) || 1
+    if (stored >= TODOS_VERSION) return list
+    const migrated = migrateTodos(list, stored)
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated))
+    localStorage.setItem(VERSION_KEY, String(TODOS_VERSION))
+    return migrated
   } catch {
     return []
   }
@@ -60,7 +94,19 @@ export const useTodoStore = defineStore('todos', () => {
   const todos = ref<TodoRecord[]>(loadTodos())
   const categories = ref<string[]>(loadCategories())
 
-  watch(todos, (v) => localStorage.setItem(STORAGE_KEY, JSON.stringify(v)), { deep: true })
+  // 持久化防抖 200ms：高频操作（连续勾选/编辑）合并为一次写入（审查 L-7）
+  let persistTimer: number | undefined
+  watch(
+    todos,
+    (v) => {
+      clearTimeout(persistTimer)
+      persistTimer = window.setTimeout(
+        () => localStorage.setItem(STORAGE_KEY, JSON.stringify(v)),
+        200
+      )
+    },
+    { deep: true }
+  )
   watch(
     categories,
     (v) =>
@@ -111,6 +157,15 @@ export const useTodoStore = defineStore('todos', () => {
         t.createdAt < endOfYesterday.getTime() &&
         !(t.doneDates ?? []).includes(yk)
     ).length
+  })
+
+  /** 每日任务连续打卡缓存表 id → 天数（审查 M-15：避免 v-for 每行重复回溯计算） */
+  const streaks = computed<Record<string, number>>(() => {
+    const map: Record<string, number> = {}
+    for (const t of todos.value) {
+      if (t.category === DAILY_CATEGORY) map[t.id] = streak(t)
+    }
+    return map
   })
 
   /** 每日任务连续打卡天数（含今天，若今天未完成则从昨天起算） */
@@ -222,6 +277,7 @@ export const useTodoStore = defineStore('todos', () => {
     categoryProgress,
     completedCountOn,
     streak,
+    streaks,
     add,
     toggle,
     remove,

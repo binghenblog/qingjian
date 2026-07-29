@@ -23,10 +23,13 @@ export interface TodoRecord {
   createdAt: number
 }
 
-export interface ChatSession {
+export interface NoteRecord {
   id: string
   title: string
-  provider: 'cloud' | 'local'
-  model: string
+  content: string
+  tags: string[]
+  /** 所属文件夹名；空字符串 = 未分类 */
+  folder: string
   createdAt: number
+  updatedAt: number
 }

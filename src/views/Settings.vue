@@ -159,7 +159,7 @@ const channels: { value: AIProviderType; label: string; icon: string }[] = [
         </label>
       </div>
 
-      <label v-if="settings.aiProvider === 'cloud'" class="field">
+      <div v-if="settings.aiProvider === 'cloud'" class="field">
         <span class="field-label">API Key</span>
         <input
           v-model="settings.aiApiKey"
@@ -167,10 +167,14 @@ const channels: { value: AIProviderType; label: string; icon: string }[] = [
           class="input-modern w-full px-3 py-2 text-sm"
           placeholder="sk-..."
         />
+        <label class="flex items-center gap-2 text-xs text-fg-soft mt-2 cursor-pointer select-none">
+          <input v-model="settings.aiKeyRemember" type="checkbox" class="cursor-pointer" />
+          在本机记住密钥（写入 localStorage；不勾选则关闭浏览器即清除）
+        </label>
         <p class="field-hint">
-          ⚠️ 仅保存在本机浏览器（localStorage）。纯 Web 端直连云端可能受 CORS 限制；桌面版将经本地后端中转，更安全。
+          ⚠️ 密钥仅保存在本机浏览器，默认只在当前会话有效。纯 Web 端直连云端可能受 CORS 限制；桌面版将经本地后端中转并加密保管，更安全。
         </p>
-      </label>
+      </div>
     </section>
 
     <!-- 数据与存储 -->

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, nextTick, computed } from 'vue'
+import { ref, nextTick, computed, watch, onUnmounted } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
 import { createProvider, type ChatMessage, type AIConfig } from '@/services/ai'
 
@@ -10,10 +10,40 @@ interface Bubble {
   content: string
 }
 
+/** 会话内历史持久化（审查 M-17）：切页/刷新不丢，关浏览器即清 */
+const HISTORY_KEY = 'qingjian.ai-history'
+
+function loadHistory(): Bubble[] {
+  try {
+    const raw = sessionStorage.getItem(HISTORY_KEY)
+    const list = raw ? JSON.parse(raw) : []
+    return Array.isArray(list) ? list : []
+  } catch {
+    return []
+  }
+}
+
 const input = ref('')
 const loading = ref(false)
-const bubbles = ref<Bubble[]>([])
+const bubbles = ref<Bubble[]>(loadHistory())
 const scrollEl = ref<HTMLElement>()
+
+watch(
+  bubbles,
+  (v) => {
+    try {
+      sessionStorage.setItem(HISTORY_KEY, JSON.stringify(v))
+    } catch {
+      /* 配额满等异常忽略 */
+    }
+  },
+  { deep: true }
+)
+
+function clearHistory() {
+  bubbles.value = []
+  sessionStorage.removeItem(HISTORY_KEY)
+}
 
 const channelLabel = computed(() => {
   const type = settings.aiProvider === 'cloud' ? '云端' : '本地 Ollama'
@@ -36,6 +66,15 @@ async function scrollBottom() {
   scrollEl.value?.scrollTo({ top: scrollEl.value.scrollHeight, behavior: 'smooth' })
 }
 
+/** 流式请求中止（审查 M-3） */
+let controller: AbortController | null = null
+
+function stop() {
+  controller?.abort()
+}
+
+onUnmounted(() => controller?.abort())
+
 async function send() {
   const text = input.value.trim()
   if (!text || loading.value) return
@@ -52,17 +91,23 @@ async function send() {
     .filter((b) => b !== assistant && b.content)
     .map((b) => ({ role: b.role, content: b.content }))
 
+  controller = new AbortController()
   try {
     const provider = createProvider(buildConfig())
-    for await (const token of provider.chat(messages)) {
+    for await (const token of provider.chat(messages, controller.signal)) {
       assistant.content += token
       await scrollBottom()
     }
     if (!assistant.content) assistant.content = '（模型未返回内容）'
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : '请求失败'
-    assistant.content = `⚠️ ${msg}\n\n如为云端通道，纯 Web 端可能受 CORS 限制；桌面版会经本地后端中转解决此问题。`
+    if (e instanceof DOMException && e.name === 'AbortError') {
+      if (!assistant.content) assistant.content = '（已停止）'
+    } else {
+      const msg = e instanceof Error ? e.message : '请求失败'
+      assistant.content = `⚠️ ${msg}\n\n如为云端通道，纯 Web 端可能受 CORS 限制；桌面版会经本地后端中转解决此问题。`
+    }
   } finally {
+    controller = null
     loading.value = false
     await scrollBottom()
   }
@@ -75,7 +120,13 @@ async function send() {
     <div class="flex items-center gap-2 mb-3 text-xs text-fg-faint">
       <span class="w-1.5 h-1.5 rounded-full" :class="settings.aiProvider === 'cloud' ? 'bg-sky-500' : 'bg-brand'" />
       <span>当前通道：{{ channelLabel }}</span>
-      <RouterLink to="/settings" class="ml-auto text-brand-strong hover:underline">去设置切换</RouterLink>
+      <button
+        v-if="bubbles.length"
+        @click="clearHistory"
+        class="ml-auto bg-transparent border-none text-fg-faint hover:text-red-500 cursor-pointer text-xs p-0"
+        title="清空当前对话"
+      >清空对话</button>
+      <RouterLink to="/settings" class="text-brand-strong hover:underline" :class="{ 'ml-auto': !bubbles.length }">去设置切换</RouterLink>
     </div>
 
     <!-- 对话区 -->
@@ -118,13 +169,23 @@ async function send() {
       <textarea
         v-model="input"
         @keydown.enter.exact.prevent="send"
-        :placeholder="needsKey ? '云端通道需要先在设置填写 API Key' : '说点什么…（Enter 发送）'"
+        :placeholder="needsKey ? '云端通道需要先在设置填写 API Key' : '说点什么…（Enter 发送，Shift+Enter 换行）'"
         rows="1"
         class="flex-1 px-3 py-2 bg-transparent border-none outline-none text-sm text-fg placeholder:text-fg-faint resize-none max-h-32 leading-relaxed"
       />
+      <!-- 流式输出中显示停止按钮（M-3） -->
       <button
+        v-if="loading"
+        @click="stop"
+        class="stop-btn w-9 h-9 grid place-items-center rounded-xl shrink-0 cursor-pointer"
+        title="停止生成"
+      >
+        <span class="i-carbon-stop-filled text-base" />
+      </button>
+      <button
+        v-else
         @click="send"
-        :disabled="loading || !input.trim() || needsKey"
+        :disabled="!input.trim() || needsKey"
         class="btn-primary w-9 h-9 grid place-items-center rounded-xl shrink-0"
       >
         <span class="i-carbon-send-alt text-base" />
@@ -159,6 +220,14 @@ async function send() {
   border-color: var(--c-brand);
   box-shadow: 0 0 0 3px var(--c-brand-soft);
 }
+
+.stop-btn {
+  background: var(--c-bg);
+  border: 1px solid var(--c-border);
+  color: #ef4444;
+  transition: border-color 0.15s ease;
+}
+.stop-btn:hover { border-color: #ef4444; }
 
 .dots { min-height: 18px; }
 .dot {

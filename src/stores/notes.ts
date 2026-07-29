@@ -2,6 +2,11 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { storage, type NoteRecord } from '@/services/storage'
 
+/** 入库前转纯对象：剥离 Vue 响应式 Proxy，避免 IndexedDB 结构化克隆失败 */
+function toPlain(n: NoteRecord): NoteRecord {
+  return { ...n, tags: [...n.tags] }
+}
+
 const FOLDERS_KEY = 'qingjian.note-folders'
 
 function loadFolders(): string[] {
@@ -69,14 +74,22 @@ export const useNoteStore = defineStore('notes', () => {
     return true
   }
 
-  /** 删除文件夹：其下笔记归为未分类 */
+  /** 删除文件夹：其下笔记归为未分类（批量写盘，失败回滚，审查 M-7/H-4） */
   async function removeFolder(name: string) {
+    const affected = notes.value.filter((n) => n.folder === name)
+    const prevFolders = [...folders.value]
     folders.value = folders.value.filter((f) => f !== name)
     persistFolders()
-    const affected = notes.value.filter((n) => n.folder === name)
-    for (const n of affected) {
-      n.folder = ''
-      await storage.saveNote({ ...n })
+    affected.forEach((n) => (n.folder = ''))
+    try {
+      await storage.saveNotes(affected.map(toPlain))
+      lastError.value = null
+    } catch (e) {
+      affected.forEach((n) => (n.folder = name))
+      folders.value = prevFolders
+      persistFolders()
+      lastError.value = `删除文件夹失败：${(e as Error).message}`
+      throw e
     }
   }
 
@@ -102,14 +115,26 @@ export const useNoteStore = defineStore('notes', () => {
     return n
   }
 
+  /** 最近一次持久化失败信息（供 UI 提示） */
+  const lastError = ref<string | null>(null)
+
   async function update(
     id: string,
     patch: Partial<Pick<NoteRecord, 'title' | 'content' | 'tags' | 'folder'>>
   ) {
     const n = notes.value.find((x) => x.id === id)
     if (!n) return
+    // 先留快照，写盘失败时回滚内存态，保证内存与磁盘一致（审查 H-4）
+    const snapshot = { ...n, tags: [...n.tags] }
     Object.assign(n, patch, { updatedAt: Date.now() })
-    await storage.saveNote({ ...n })
+    try {
+      await storage.saveNote(toPlain(n))
+      lastError.value = null
+    } catch (e) {
+      Object.assign(n, snapshot)
+      lastError.value = `保存失败：${(e as Error).message}`
+      throw e
+    }
   }
 
   async function remove(id: string) {
@@ -161,6 +186,7 @@ export const useNoteStore = defineStore('notes', () => {
     current,
     tags,
     loaded,
+    lastError,
     folders,
     folderCounts,
     load,

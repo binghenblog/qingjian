@@ -45,8 +45,9 @@ function readJson<T>(key: string, fallback: T): T {
 export async function createBackup(): Promise<BackupFile> {
   const notes = await storage.listNotes()
   const settings = readJson<Record<string, unknown> | null>(LS_KEYS.settings, null)
-  // 脱敏：API Key 不随备份导出
-  const safeSettings = settings ? { ...settings, aiApiKey: '' } : null
+  // 脱敏：API Key 不随备份导出（新版设置已不含 Key，此处兜底剥离旧字段）
+  const safeSettings = settings ? { ...settings, aiApiKey: undefined } : null
+  if (safeSettings) delete safeSettings.aiApiKey
 
   return {
     app: 'qingjian',
@@ -110,15 +111,15 @@ export async function importBackup(backup: BackupFile, mode: ImportMode): Promis
   }))
 
   if (mode === 'replace') {
-    const existing = await storage.listNotes()
-    for (const n of existing) await storage.deleteNote(n.id)
-    for (const n of incomingNotes) await storage.saveNote(n)
+    // 原子替换：清空 + 写入同一事务，中途失败自动回滚，不会出现「清空了却没写进去」（审查 H-5）
+    await storage.replaceAllNotes(incomingNotes)
   } else {
     const existing = new Map((await storage.listNotes()).map((n) => [n.id, n]))
-    for (const n of incomingNotes) {
+    const toSave = incomingNotes.filter((n) => {
       const old = existing.get(n.id)
-      if (!old || n.updatedAt >= old.updatedAt) await storage.saveNote(n)
-    }
+      return !old || n.updatedAt >= old.updatedAt
+    })
+    await storage.saveNotes(toSave)
   }
 
   /* ---------- 待办 / 分类 / 文件夹（localStorage） ---------- */
@@ -129,9 +130,10 @@ export async function importBackup(backup: BackupFile, mode: ImportMode): Promis
     write(LS_KEYS.todoCategories, backup.todoCategories ?? [])
     write(LS_KEYS.noteFolders, backup.noteFolders ?? [])
     if (backup.settings) {
-      // 保留本机已配置的 API Key
-      const cur = readJson<Record<string, unknown> | null>(LS_KEYS.settings, null)
-      write(LS_KEYS.settings, { ...backup.settings, aiApiKey: cur?.aiApiKey ?? '' })
+      // 剥离旧版备份可能带的 aiApiKey 字段（新版 Key 单独存储，不受导入影响）
+      const incoming = { ...backup.settings }
+      delete incoming.aiApiKey
+      write(LS_KEYS.settings, incoming)
     }
     if (backup.theme) localStorage.setItem(LS_KEYS.theme, backup.theme)
   } else {

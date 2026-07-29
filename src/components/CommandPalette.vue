@@ -80,13 +80,14 @@ function onKeydown(e: KeyboardEvent) {
   }
   if (!props.open) return
   if (e.key === 'Escape') emit('update:open', false)
+  const len = items.value.length
   if (e.key === 'ArrowDown') {
     e.preventDefault()
-    activeIdx.value = (activeIdx.value + 1) % items.value.length
+    if (len > 0) activeIdx.value = (activeIdx.value + 1) % len
   }
   if (e.key === 'ArrowUp') {
     e.preventDefault()
-    activeIdx.value = (activeIdx.value - 1 + items.value.length) % items.value.length
+    if (len > 0) activeIdx.value = (activeIdx.value - 1 + len) % len
   }
   if (e.key === 'Enter' && items.value[activeIdx.value]) {
     go(items.value[activeIdx.value])

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import MarkdownIt from 'markdown-it'
 import { useNoteStore } from '@/stores/notes'
 
@@ -40,9 +40,24 @@ async function delFolder(name: string) {
 const hasUncategorized = computed(() => (store.folderCounts[''] ?? 0) > 0)
 
 /** 列表：搜索时全库全文搜索（忽略文件夹）；否则按当前文件夹过滤 */
-const searching = computed(() => search.value.trim().length > 0)
+/** 搜索防抖（200ms）：避免每次按键都全库扫描 */
+const debouncedSearch = ref('')
+let searchTimer: number | undefined
+watch(search, (v) => {
+  clearTimeout(searchTimer)
+  // 清空立即生效，输入才防抖
+  if (!v.trim()) {
+    debouncedSearch.value = ''
+    return
+  }
+  searchTimer = window.setTimeout(() => (debouncedSearch.value = v), 200)
+})
 
-const searchResults = computed(() => (searching.value ? store.searchNotes(search.value) : []))
+const searching = computed(() => debouncedSearch.value.trim().length > 0)
+
+const searchResults = computed(() =>
+  debouncedSearch.value.trim() ? store.searchNotes(debouncedSearch.value) : []
+)
 
 const filtered = computed(() => {
   if (searching.value) return searchResults.value.map((r) => r.note)
@@ -53,7 +68,7 @@ const filtered = computed(() => {
 /** 搜索摘要（含高亮）：id -> html */
 const snippetMap = computed(() => {
   const map: Record<string, string> = {}
-  for (const r of searchResults.value) map[r.note.id] = highlight(r.snippet, search.value.trim())
+  for (const r of searchResults.value) map[r.note.id] = highlight(r.snippet, debouncedSearch.value.trim())
   return map
 })
 
@@ -70,24 +85,55 @@ function highlight(text: string, q: string) {
 }
 
 function highlightTitle(title: string) {
-  return searching.value ? highlight(title || '无标题笔记', search.value.trim()) : escapeHtml(title || '无标题笔记')
+  return searching.value
+    ? highlight(title || '无标题笔记', debouncedSearch.value.trim())
+    : escapeHtml(title || '无标题笔记')
 }
 
 const rendered = computed(() => (store.current ? md.render(store.current.content || '') : ''))
 
-/** 自动保存（防抖 500ms） */
-let timer: number | undefined
+/**
+ * 自动保存（防抖 500ms）。
+ * 修复竞态（审查 H-1）：定时器触发时固定使用触发编辑那一刻的笔记 id 与内容快照，
+ * 快速切换笔记不会把 A 的内容写进 B；切换笔记时立即冲刷未保存的修改。
+ */
+let saveTimer: number | undefined
+let pendingSave: { id: string; title: string; content: string } | null = null
+
+function flushSave() {
+  clearTimeout(saveTimer)
+  if (pendingSave) {
+    const { id, title, content } = pendingSave
+    pendingSave = null
+    store.update(id, { title, content })
+  }
+}
+
+let watchedId: string | null = null
 watch(
-  () => [store.current?.title, store.current?.content],
+  () => [store.current?.id, store.current?.title, store.current?.content] as const,
   () => {
-    if (!store.current) return
-    clearTimeout(timer)
-    timer = window.setTimeout(() => {
-      const c = store.current
-      if (c) store.update(c.id, { title: c.title, content: c.content })
-    }, 500)
+    const c = store.current
+    if (!c) {
+      watchedId = null
+      return
+    }
+    // 切换笔记：冲刷上一篇未保存的修改，但「选中」本身不算编辑，不触发保存
+    if (c.id !== watchedId) {
+      flushSave()
+      watchedId = c.id
+      return
+    }
+    pendingSave = { id: c.id, title: c.title, content: c.content }
+    clearTimeout(saveTimer)
+    saveTimer = window.setTimeout(flushSave, 500)
   }
 )
+
+onUnmounted(() => {
+  flushSave()
+  clearTimeout(searchTimer)
+})
 
 function fmt(ts: number) {
   return new Date(ts).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })
