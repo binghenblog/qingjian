@@ -137,8 +137,11 @@ function addProgress() {
           >
             <button
               @click="store.toggle(t.id)"
-              class="check w-5 h-5 rounded-full grid place-items-center shrink-0 cursor-pointer"
-            />
+              class="check w-5 h-5 rounded-full flex items-center justify-center shrink-0 cursor-pointer"
+              :class="{ 'check-done': t.done }"
+            >
+              <span v-if="t.done" class="i-carbon-checkmark text-[11px] leading-none text-white" />
+            </button>
             <span class="flex-1 text-sm truncate">{{ t.title }}</span>
             <TodoBadges :priority="t.priority" :tag="t.tag" />
           </li>
@@ -269,6 +272,10 @@ function addProgress() {
 .check:hover {
   border-color: var(--c-brand);
   background: var(--c-brand-soft);
+}
+.check-done {
+  border-color: var(--c-brand);
+  background: var(--c-brand-grad);
 }
 
 .empty { border: 1.5px dashed var(--c-border); }

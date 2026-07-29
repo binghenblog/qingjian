@@ -88,10 +88,10 @@ function add() {
       >
         <button
           @click="store.toggle(t.id)"
-          class="check w-5 h-5 rounded-full grid place-items-center shrink-0 cursor-pointer"
+          class="check w-5 h-5 rounded-full flex items-center justify-center shrink-0 cursor-pointer"
           :class="t.done ? 'check-done' : ''"
         >
-          <span v-if="t.done" class="i-carbon-checkmark text-xs text-white" />
+          <span v-if="t.done" class="i-carbon-checkmark text-[11px] leading-none text-white" />
         </button>
         <span class="flex-1 text-sm transition-all" :class="t.done ? 'line-through text-fg-faint' : ''">
           {{ t.title }}
