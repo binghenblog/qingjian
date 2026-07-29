@@ -99,7 +99,6 @@ pnpm tauri build    # 打包出安装包（Windows: .msi/.exe；Linux/macOS；An
 
 ```
 qingjian/
-├── docs/                  # 文档（开发文档、审查报告）
 ├── public/                # 静态资源（图标等）
 ├── src/                   # 前端源码（Vue 3 + Vite）
 │   ├── components/        # 通用组件（命令面板、任务徽章）
@@ -160,7 +159,7 @@ qingjian/
 - **网络防护**：自定义 AI endpoint 做 SSRF 校验，屏蔽云元数据地址。
 - **仓库安全**：密钥、用户数据、`*.db`、构建产物均被 `.gitignore` 排除；启用 Dependabot / Secret Scanning / CodeQL（详见开发文档安全清单）。
 
-更多细节见 [SECURITY.md](SECURITY.md) 与 [开发文档](docs/青简-开发文档.md) 第 10 节。
+更多细节见 [SECURITY.md](SECURITY.md)。
 
 ---
 
