@@ -20,7 +20,7 @@ tauri-plugin-fs = "2.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 # 桌面端 AI 中转（审查 C-2/C-3）：rustls-tls 避免对系统 OpenSSL 的依赖，跨平台可复现构建
-reqwest = { version = "0.12", features = ["json", "stream", "rustls-tls"] }
+reqwest = { version = "0.13", features = ["json", "stream", "rustls-tls"] }
 futures-util = "0.3"
 
 [features]
