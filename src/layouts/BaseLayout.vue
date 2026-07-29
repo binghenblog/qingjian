@@ -2,7 +2,9 @@
 import { ref } from 'vue'
 import { useRoute } from 'vue-router'
 import CommandPalette from '@/components/CommandPalette.vue'
+import { useShortcuts } from '@/composables/useShortcuts'
 
+useShortcuts()
 const route = useRoute()
 const paletteOpen = ref(false)
 

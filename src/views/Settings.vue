@@ -1,9 +1,79 @@
 <script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
 import { useTheme, type ThemeMode } from '@/composables/useTheme'
 import { useSettingsStore, type AIProviderType } from '@/stores/settings'
+import { useNoteStore } from '@/stores/notes'
+import { useTodoStore } from '@/stores/todos'
+import { exportToFile, readBackupFile, importBackup, type ImportMode } from '@/services/backup'
 
 const { theme, setTheme } = useTheme()
 const settings = useSettingsStore()
+const noteStore = useNoteStore()
+const todoStore = useTodoStore()
+
+onMounted(() => noteStore.load())
+
+/* ---------- 数据管理 ---------- */
+const noteCount = computed(() => noteStore.notes.length)
+const todoCount = computed(() => todoStore.todos.length)
+
+const fileInput = ref<HTMLInputElement>()
+const importMode = ref<ImportMode>('merge')
+const busy = ref(false)
+const dataMsg = ref<{ type: 'ok' | 'err'; text: string } | null>(null)
+
+async function onExport() {
+  try {
+    busy.value = true
+    await exportToFile()
+    dataMsg.value = { type: 'ok', text: '备份文件已下载（不含 API Key）' }
+  } catch (e) {
+    dataMsg.value = { type: 'err', text: `导出失败：${(e as Error).message}` }
+  } finally {
+    busy.value = false
+  }
+}
+
+function pickFile(mode: ImportMode) {
+  importMode.value = mode
+  fileInput.value?.click()
+}
+
+async function onFileChosen(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  ;(e.target as HTMLInputElement).value = ''
+  if (!file) return
+  if (
+    importMode.value === 'replace' &&
+    !confirm('覆盖导入会清空当前所有笔记与待办，并用备份内容替换。确定继续吗？')
+  )
+    return
+  try {
+    busy.value = true
+    const backup = await readBackupFile(file)
+    const r = await importBackup(backup, importMode.value)
+    dataMsg.value = {
+      type: 'ok',
+      text: `导入成功：笔记 ${r.notes} 条、待办 ${r.todos} 条（${importMode.value === 'merge' ? '合并' : '覆盖'}模式），页面即将刷新…`
+    }
+    // localStorage 数据需重新初始化各 store，最稳妥的方式是整页刷新
+    setTimeout(() => location.reload(), 1200)
+  } catch (err) {
+    dataMsg.value = { type: 'err', text: `导入失败：${(err as Error).message}` }
+  } finally {
+    busy.value = false
+  }
+}
+
+/* ---------- 快捷键说明 ---------- */
+const shortcuts = [
+  { keys: ['Ctrl', 'K'], desc: '命令面板 · 全局搜索' },
+  { keys: ['Alt', '1'], desc: '仪表盘' },
+  { keys: ['Alt', '2'], desc: '笔记' },
+  { keys: ['Alt', '3'], desc: '待办' },
+  { keys: ['Alt', '4'], desc: 'AI 助手' },
+  { keys: ['Alt', '5'], desc: '设置' }
+]
 
 const modes: { value: ThemeMode; label: string; icon: string }[] = [
   { value: 'light', label: '浅色', icon: 'i-carbon-sun' },
@@ -91,12 +161,52 @@ const channels: { value: AIProviderType; label: string; icon: string }[] = [
       </label>
     </section>
 
-    <!-- 数据（占位） -->
-    <section class="setting-card rounded-2xl p-5">
-      <div class="font-semibold text-sm mb-1">数据与存储</div>
-      <p class="text-xs text-fg-faint mt-0 mb-0">
-        M4 实现：存储路径选择 · AI Key 本地加密 · 数据导出/导入 · Obsidian Vault 路径绑定
+    <!-- 数据与存储 -->
+    <section class="setting-card rounded-2xl p-5 space-y-4">
+      <div>
+        <div class="font-semibold text-sm mb-1">数据与存储</div>
+        <p class="text-xs text-fg-faint mt-0 mb-0">
+          当前本机数据：<b class="text-fg">{{ noteCount }}</b> 条笔记 ·
+          <b class="text-fg">{{ todoCount }}</b> 条待办。备份为 JSON 文件，可跨设备恢复。
+        </p>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <button class="btn-primary px-4 py-2 rounded-xl text-sm flex items-center gap-1.5" :disabled="busy" @click="onExport">
+          <span class="i-carbon-download text-base" />
+          导出备份
+        </button>
+        <button class="data-btn px-4 py-2 rounded-xl text-sm flex items-center gap-1.5" :disabled="busy" @click="pickFile('merge')">
+          <span class="i-carbon-upload text-base" />
+          导入（合并）
+        </button>
+        <button class="data-btn data-btn-danger px-4 py-2 rounded-xl text-sm flex items-center gap-1.5" :disabled="busy" @click="pickFile('replace')">
+          <span class="i-carbon-warning-alt text-base" />
+          导入（覆盖）
+        </button>
+        <input ref="fileInput" type="file" accept=".json,application/json" class="hidden" @change="onFileChosen" />
+      </div>
+
+      <p v-if="dataMsg" class="text-xs m-0" :class="dataMsg.type === 'ok' ? 'msg-ok' : 'msg-err'">
+        {{ dataMsg.text }}
       </p>
+      <p class="field-hint m-0">
+        合并：按 id 去重，同一笔记保留较新版本；覆盖：清空当前数据后整体恢复（会先确认）。备份不包含 API Key。
+      </p>
+    </section>
+
+    <!-- 快捷键 -->
+    <section class="setting-card rounded-2xl p-5">
+      <div class="font-semibold text-sm mb-1">快捷键</div>
+      <p class="text-xs text-fg-faint mt-0 mb-4">随时随地快速跳转</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div v-for="s in shortcuts" :key="s.desc" class="flex items-center justify-between px-3 py-2 rounded-xl kbd-row">
+          <span class="text-sm text-fg-soft">{{ s.desc }}</span>
+          <span class="flex items-center gap-1">
+            <kbd v-for="k in s.keys" :key="k" class="kbd">{{ k }}</kbd>
+          </span>
+        </div>
+      </div>
     </section>
 
     <!-- 关于 -->
@@ -146,5 +256,45 @@ const channels: { value: AIProviderType; label: string; icon: string }[] = [
 .logo {
   background: var(--c-brand-grad);
   box-shadow: 0 4px 12px var(--c-brand-soft);
+}
+
+/* 数据管理按钮 */
+.data-btn {
+  background: var(--c-bg);
+  border: 1px solid var(--c-border);
+  color: var(--c-fg-soft);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.data-btn:hover:not(:disabled) {
+  color: var(--c-fg);
+  border-color: var(--c-brand);
+  background: var(--c-brand-soft);
+}
+.data-btn-danger:hover:not(:disabled) {
+  color: #dc2626;
+  border-color: #dc262666;
+  background: #dc26261a;
+}
+.data-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.msg-ok { color: var(--c-brand-strong); }
+.dark .msg-ok { color: var(--c-brand); }
+.msg-err { color: #dc2626; }
+
+/* 快捷键行 */
+.kbd-row {
+  background: var(--c-bg);
+  border: 1px solid var(--c-border);
+}
+.kbd {
+  font-family: inherit;
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  box-shadow: 0 1px 0 var(--c-border);
+  color: var(--c-fg-soft);
 }
 </style>
