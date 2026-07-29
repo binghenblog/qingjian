@@ -18,6 +18,7 @@
     "@tauri-apps/plugin-fs": "^2.2.0",
     "@tauri-apps/plugin-sql": "^2.2.0",
     "dexie": "^4.0.10",
+    "markdown-it": "^14.3.0",
     "pinia": "^2.3.0",
     "vue": "^3.5.13",
     "vue-router": "^4.5.0"
@@ -25,6 +26,7 @@
   "devDependencies": {
     "@iconify-json/carbon": "^1.2.24",
     "@tauri-apps/cli": "^2.2.0",
+    "@types/markdown-it": "^14.1.2",
     "@vitejs/plugin-vue": "^5.2.0",
     "typescript": "^5.6.0",
     "unocss": "^0.64.0",

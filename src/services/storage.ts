@@ -1,3 +1,5 @@
+import Dexie, { type Table } from 'dexie'
+
 export interface NoteRecord {
   id: string
   title: string
@@ -14,26 +16,38 @@ export interface StorageAdapter {
   deleteNote(id: string): Promise<void>
 }
 
-// M0 占位实现（内存）。
-// 后续切换：
-//  - Tauri 桌面/移动：@tauri-apps/plugin-sql（SQLite）
-//  - Web 预览：Dexie（IndexedDB）
-// 通过 StorageAdapter 统一接口，业务层无感知底层差异。
-class MemoryStorage implements StorageAdapter {
-  private notes = new Map<string, NoteRecord>()
-
-  async listNotes(): Promise<NoteRecord[]> {
-    return [...this.notes.values()].sort((a, b) => b.updatedAt - a.updatedAt)
-  }
-  async getNote(id: string): Promise<NoteRecord | undefined> {
-    return this.notes.get(id)
-  }
-  async saveNote(n: NoteRecord): Promise<void> {
-    this.notes.set(n.id, n)
-  }
-  async deleteNote(id: string): Promise<void> {
-    this.notes.delete(id)
+/**
+ * 青简本地数据库（Web 端：IndexedDB / Dexie）。
+ * Tauri 桌面 / 移动端里程碑将切换为 @tauri-apps/plugin-sql（SQLite），
+ * 业务层通过 StorageAdapter 接口无感知底层差异。
+ */
+class QingjianDB extends Dexie {
+  notes!: Table<NoteRecord, string>
+  constructor() {
+    super('qingjian')
+    this.version(1).stores({
+      // 主键 id；updatedAt / createdAt 用于排序与查询
+      notes: 'id, updatedAt, createdAt'
+    })
   }
 }
 
-export const storage: StorageAdapter = new MemoryStorage()
+const db = new QingjianDB()
+
+/** Web 端 Dexie 实现 */
+class DexieStorage implements StorageAdapter {
+  async listNotes(): Promise<NoteRecord[]> {
+    return db.notes.orderBy('updatedAt').reverse().toArray()
+  }
+  async getNote(id: string): Promise<NoteRecord | undefined> {
+    return db.notes.get(id)
+  }
+  async saveNote(n: NoteRecord): Promise<void> {
+    await db.notes.put(n)
+  }
+  async deleteNote(id: string): Promise<void> {
+    await db.notes.delete(id)
+  }
+}
+
+export const storage: StorageAdapter = new DexieStorage()
