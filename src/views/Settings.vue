@@ -21,6 +21,8 @@ const fileInput = ref<HTMLInputElement>()
 const importMode = ref<ImportMode>('merge')
 const busy = ref(false)
 const dataMsg = ref<{ type: 'ok' | 'err'; text: string } | null>(null)
+/** 导入成功后需要刷新才生效（审查 M-31）：改为手动确认，不再 1.2s 后强制刷新 */
+const needReload = ref(false)
 
 async function onExport() {
   try {
@@ -39,6 +41,11 @@ function pickFile(mode: ImportMode) {
   fileInput.value?.click()
 }
 
+/** 导入成功后手动刷新（审查 M-31）：localStorage 数据需重新初始化各 store */
+function reload() {
+  location.reload()
+}
+
 async function onFileChosen(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   ;(e.target as HTMLInputElement).value = ''
@@ -54,10 +61,10 @@ async function onFileChosen(e: Event) {
     const r = await importBackup(backup, importMode.value)
     dataMsg.value = {
       type: 'ok',
-      text: `导入成功：笔记 ${r.notes} 条、待办 ${r.todos} 条（${importMode.value === 'merge' ? '合并' : '覆盖'}模式），页面即将刷新…`
+      text: `导入成功：笔记 ${r.notes} 条、待办 ${r.todos} 条（${importMode.value === 'merge' ? '合并' : '覆盖'}模式）。点击右侧按钮刷新以载入新数据。`
     }
-    // localStorage 数据需重新初始化各 store，最稳妥的方式是整页刷新
-    setTimeout(() => location.reload(), 1200)
+    // localStorage 数据需重新初始化各 store，最稳妥的方式是整页刷新；改为手动确认（审查 M-31）
+    needReload.value = true
   } catch (err) {
     dataMsg.value = { type: 'err', text: `导入失败：${(err as Error).message}` }
   } finally {
@@ -82,7 +89,7 @@ const modes: { value: ThemeMode; label: string; icon: string }[] = [
 ]
 
 const channels: { value: AIProviderType; label: string; icon: string }[] = [
-  { value: 'local', label: '本地 Ollama', icon: 'i-carbon-computer' },
+  { value: 'local', label: '本地 Ollama', icon: 'i-carbon-laptop' },
   { value: 'cloud', label: '云端兼容', icon: 'i-carbon-cloud' }
 ]
 </script>
@@ -107,11 +114,13 @@ const channels: { value: AIProviderType; label: string; icon: string }[] = [
     <section class="setting-card rounded-2xl p-5">
       <div class="font-semibold text-sm mb-1">外观</div>
       <p class="text-xs text-fg-faint mt-0 mb-4">选择界面主题模式</p>
-      <div class="seg inline-flex p-1 rounded-xl gap-1">
+      <div class="seg inline-flex p-1 rounded-xl gap-1" role="radiogroup" aria-label="主题模式">
         <button
           v-for="m in modes"
           :key="m.value"
           @click="setTheme(m.value)"
+          role="radio"
+          :aria-checked="theme === m.value ? 'true' : 'false'"
           class="seg-item flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm cursor-pointer border-none"
           :class="theme === m.value ? 'seg-active' : ''"
         >
@@ -126,18 +135,20 @@ const channels: { value: AIProviderType; label: string; icon: string }[] = [
       <div>
         <div class="font-semibold text-sm mb-1">AI 通道</div>
         <p class="text-xs text-fg-faint mt-0 mb-3">选择本地或云端模型，配置保存在本地</p>
-        <div class="seg inline-flex p-1 rounded-xl gap-1">
-          <button
-            v-for="c in channels"
-            :key="c.value"
-            @click="settings.aiProvider = c.value"
-            class="seg-item flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm cursor-pointer border-none"
-            :class="settings.aiProvider === c.value ? 'seg-active' : ''"
-          >
-            <span :class="c.icon" class="text-base" />
-            {{ c.label }}
-          </button>
-        </div>
+      <div class="seg inline-flex p-1 rounded-xl gap-1" role="radiogroup" aria-label="AI 通道">
+        <button
+          v-for="c in channels"
+          :key="c.value"
+          @click="settings.aiProvider = c.value"
+          role="radio"
+          :aria-checked="settings.aiProvider === c.value ? 'true' : 'false'"
+          class="seg-item flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm cursor-pointer border-none"
+          :class="settings.aiProvider === c.value ? 'seg-active' : ''"
+        >
+          <span :class="c.icon" class="text-base" />
+          {{ c.label }}
+        </button>
+      </div>
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -203,9 +214,14 @@ const channels: { value: AIProviderType; label: string; icon: string }[] = [
         <input ref="fileInput" type="file" accept=".json,application/json" class="hidden" @change="onFileChosen" />
       </div>
 
-      <p v-if="dataMsg" class="text-xs m-0" :class="dataMsg.type === 'ok' ? 'msg-ok' : 'msg-err'">
+      <p v-if="dataMsg" class="text-xs m-0" :class="dataMsg.type === 'ok' ? 'msg-ok' : 'msg-err'" aria-live="polite">
         {{ dataMsg.text }}
       </p>
+      <button
+        v-if="needReload"
+        @click="reload"
+        class="btn-primary px-4 py-2 rounded-xl text-sm"
+      >刷新页面载入新数据</button>
       <p class="field-hint m-0">
         合并：按 id 去重，同一笔记保留较新版本；覆盖：清空当前数据后整体恢复（会先确认）。备份不包含 API Key。
       </p>

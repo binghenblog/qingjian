@@ -76,3 +76,15 @@ class DexieStorage implements StorageAdapter {
 }
 
 export const storage: StorageAdapter = new DexieStorage()
+
+/**
+ * IndexedDB 可用性探测（审查 H-8）：隐私模式 / 存储配额满 / 老旧浏览器下可能不可用。
+ * 用于在加载前给出明确降级提示，而不是无限白屏。
+ */
+export function isStorageAvailable(): boolean {
+  try {
+    return typeof indexedDB !== 'undefined' && indexedDB !== null
+  } catch {
+    return false
+  }
+}

@@ -1,3 +1,5 @@
+import { isTauri, TauriCloudProvider } from './tauri'
+
 export type ChatRole = 'system' | 'user' | 'assistant'
 
 export interface ChatMessage {
@@ -47,6 +49,40 @@ async function* readLines(body: ReadableStream<Uint8Array>): AsyncGenerator<stri
   }
 }
 
+/** 云端模式拦截的受限内部地址（审查 M-23 SSRF 防护，主要防云元数据凭证窃取） */
+const BLOCKED_CLOUD_HOSTS = ['169.254.169.254', '0.0.0.0']
+const BLOCKED_CLOUD_PREFIX = ['169.254.', 'fe80.', '::']
+
+/**
+ * 校验并归一化 AI 接口地址（审查 M-22 协议白名单 / M-23 SSRF 防护）。
+ * - 必须 http/https 协议
+ * - 云端模式拦截链路本地/元数据地址（如 169.254.169.254），避免凭证外泄
+ *   （本地网关 127.0.0.1/localhost 仍允许，便于开发期本地代理）
+ */
+function assertSafeUrl(raw: string, kind: 'local' | 'cloud'): string {
+  const base = raw.trim()
+  if (!base) {
+    throw new Error(kind === 'cloud' ? '请先在设置中填写云端接口地址' : '请先在设置中填写 Ollama 接口地址')
+  }
+  let url: URL
+  try {
+    url = new URL(base)
+  } catch {
+    throw new Error('接口地址格式不正确，需以 http:// 或 https:// 开头')
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new Error(`不支持的协议 ${url.protocol}，仅允许 http/https`)
+  }
+  if (kind === 'cloud') {
+    const host = url.hostname.toLowerCase()
+    const blocked =
+      BLOCKED_CLOUD_HOSTS.includes(host) ||
+      BLOCKED_CLOUD_PREFIX.some((p) => host.startsWith(p))
+    if (blocked) throw new Error('接口地址指向受限内部地址，已被安全策略拦截')
+  }
+  return base.replace(/\/$/, '')
+}
+
 /** 本地 Ollama（直连 11434，ndjson 流） */
 export class OllamaProvider implements AIProvider {
   id = 'ollama'
@@ -55,7 +91,7 @@ export class OllamaProvider implements AIProvider {
   constructor(private cfg: AIConfig) {}
 
   async *chat(messages: ChatMessage[], signal?: AbortSignal): AsyncGenerator<string> {
-    const base = this.cfg.baseUrl.replace(/\/$/, '')
+    const base = assertSafeUrl(this.cfg.baseUrl, 'local')
     const res = await fetch(`${base}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -94,7 +130,7 @@ export class CloudProvider implements AIProvider {
   constructor(private cfg: AIConfig) {}
 
   async *chat(messages: ChatMessage[], signal?: AbortSignal): AsyncGenerator<string> {
-    const base = this.cfg.baseUrl.replace(/\/$/, '')
+    const base = assertSafeUrl(this.cfg.baseUrl, 'cloud')
     const url = base.endsWith('/chat/completions') ? base : `${base}/chat/completions`
     // 空 Key 不携带 Authorization 头（审查 L-8）
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
@@ -132,5 +168,10 @@ export class CloudProvider implements AIProvider {
 
 /** 按配置返回对应 provider 实例 */
 export function createProvider(cfg: AIConfig): AIProvider {
-  return cfg.type === 'cloud' ? new CloudProvider(cfg) : new OllamaProvider(cfg)
+  if (cfg.type === 'cloud') {
+    // 桌面版经 Rust 后端中转（审查 C-2/C-3）；Web 版直连
+    if (isTauri()) return new TauriCloudProvider(cfg)
+    return new CloudProvider(cfg)
+  }
+  return new OllamaProvider(cfg)
 }

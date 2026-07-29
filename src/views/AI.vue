@@ -27,6 +27,8 @@ const input = ref('')
 const loading = ref(false)
 const bubbles = ref<Bubble[]>(loadHistory())
 const scrollEl = ref<HTMLElement>()
+/** 屏幕阅读器状态播报（审查 C-6）：流式生成/停止/出错时通知 */
+const srStatus = ref('')
 
 watch(
   bubbles,
@@ -86,6 +88,7 @@ async function send() {
 
   const assistant: Bubble = { role: 'assistant', content: '' }
   bubbles.value.push(assistant)
+  srStatus.value = '正在生成回复…'
 
   const messages: ChatMessage[] = bubbles.value
     .filter((b) => b !== assistant && b.content)
@@ -102,9 +105,11 @@ async function send() {
   } catch (e: unknown) {
     if (e instanceof DOMException && e.name === 'AbortError') {
       if (!assistant.content) assistant.content = '（已停止）'
+      srStatus.value = '已停止生成'
     } else {
       const msg = e instanceof Error ? e.message : '请求失败'
       assistant.content = `⚠️ ${msg}\n\n如为云端通道，纯 Web 端可能受 CORS 限制；桌面版会经本地后端中转解决此问题。`
+      srStatus.value = 'AI 回复出错'
     }
   } finally {
     controller = null
@@ -116,6 +121,8 @@ async function send() {
 
 <template>
   <div class="flex flex-col h-full max-w-3xl">
+    <!-- 屏幕阅读器状态播报（审查 C-6） -->
+    <div class="sr-only" role="status" aria-live="polite">{{ srStatus }}</div>
     <!-- 通道状态条 -->
     <div class="flex items-center gap-2 mb-3 text-xs text-fg-faint">
       <span class="w-1.5 h-1.5 rounded-full" :class="settings.aiProvider === 'cloud' ? 'bg-sky-500' : 'bg-brand'" />
@@ -125,6 +132,7 @@ async function send() {
         @click="clearHistory"
         class="ml-auto bg-transparent border-none text-fg-faint hover:text-red-500 cursor-pointer text-xs p-0"
         title="清空当前对话"
+        aria-label="清空当前对话"
       >清空对话</button>
       <RouterLink to="/settings" class="text-brand-strong hover:underline" :class="{ 'ml-auto': !bubbles.length }">去设置切换</RouterLink>
     </div>
@@ -179,6 +187,7 @@ async function send() {
         @click="stop"
         class="stop-btn w-9 h-9 grid place-items-center rounded-xl shrink-0 cursor-pointer"
         title="停止生成"
+        aria-label="停止生成"
       >
         <span class="i-carbon-stop-filled text-base" />
       </button>
@@ -187,6 +196,7 @@ async function send() {
         @click="send"
         :disabled="!input.trim() || needsKey"
         class="btn-primary w-9 h-9 grid place-items-center rounded-xl shrink-0"
+        aria-label="发送消息"
       >
         <span class="i-carbon-send-alt text-base" />
       </button>

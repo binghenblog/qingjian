@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { storage, type NoteRecord } from '@/services/storage'
+import { storage, isStorageAvailable, type NoteRecord } from '@/services/storage'
 
 /** 入库前转纯对象：剥离 Vue 响应式 Proxy，避免 IndexedDB 结构化克隆失败 */
 function toPlain(n: NoteRecord): NoteRecord {
@@ -27,6 +27,8 @@ export const useNoteStore = defineStore('notes', () => {
   const notes = ref<NoteRecord[]>([])
   const currentId = ref<string | null>(null)
   const loaded = ref(false)
+  /** 加载失败信息（IndexedDB 不可用等），供 UI 降级提示而非白屏（审查 H-8） */
+  const loadError = ref<string | null>(null)
 
   /** 用户创建的文件夹（有序） */
   const folders = ref<string[]>(loadFolders())
@@ -36,19 +38,29 @@ export const useNoteStore = defineStore('notes', () => {
   }
 
   async function load() {
-    notes.value = await storage.listNotes()
-    // 兜底：笔记里出现但列表里没有的文件夹（如导入数据），自动补录
-    const known = new Set(folders.value)
-    let dirty = false
-    notes.value.forEach((n) => {
-      if (n.folder && !known.has(n.folder)) {
-        folders.value.push(n.folder)
-        known.add(n.folder)
-        dirty = true
-      }
-    })
-    if (dirty) persistFolders()
-    loaded.value = true
+    if (loaded.value || loadError.value) return
+    if (!isStorageAvailable()) {
+      loadError.value = '当前浏览器禁用了本地数据库（IndexedDB），笔记无法持久化。请检查隐私/无痕模式设置。'
+      return
+    }
+    try {
+      notes.value = await storage.listNotes()
+      // 兜底：笔记里出现但列表里没有的文件夹（如导入数据），自动补录
+      const known = new Set(folders.value)
+      let dirty = false
+      notes.value.forEach((n) => {
+        if (n.folder && !known.has(n.folder)) {
+          folders.value.push(n.folder)
+          known.add(n.folder)
+          dirty = true
+        }
+      })
+      if (dirty) persistFolders()
+      loaded.value = true
+    } catch (e) {
+      // 写盘/读取失败：暴露错误，UI 显示降级提示（审查 H-8），不再卡在加载态
+      loadError.value = e instanceof Error ? e.message : '本地数据库读取失败，笔记加载不出来'
+    }
   }
 
   const current = computed(() => notes.value.find((n) => n.id === currentId.value) ?? null)
@@ -186,6 +198,7 @@ export const useNoteStore = defineStore('notes', () => {
     current,
     tags,
     loaded,
+    loadError,
     lastError,
     folders,
     folderCounts,

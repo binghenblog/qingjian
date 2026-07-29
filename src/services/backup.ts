@@ -46,8 +46,21 @@ export async function createBackup(): Promise<BackupFile> {
   const notes = await storage.listNotes()
   const settings = readJson<Record<string, unknown> | null>(LS_KEYS.settings, null)
   // 脱敏：API Key 不随备份导出（新版设置已不含 Key，此处兜底剥离旧字段）
-  const safeSettings = settings ? { ...settings, aiApiKey: undefined } : null
-  if (safeSettings) delete safeSettings.aiApiKey
+  const safeSettings: Record<string, unknown> | null = settings
+    ? { ...settings, aiApiKey: undefined }
+    : null
+  if (safeSettings) {
+    delete safeSettings.aiApiKey
+    // 导出时剥离 aiBaseUrl 的 query string（审查 M-24）：部分服务会把 API Key 拼在 URL 上
+    if (typeof safeSettings.aiBaseUrl === 'string') {
+      try {
+        const u = new URL(safeSettings.aiBaseUrl)
+        safeSettings.aiBaseUrl = u.origin + u.pathname
+      } catch {
+        /* 非法 URL 保持原样，导入端会校验 */
+      }
+    }
+  }
 
   return {
     app: 'qingjian',
@@ -86,6 +99,12 @@ export function validateBackup(data: unknown): string | null {
   if (typeof b.version !== 'number') return '备份文件缺少版本号'
   if (b.version > BACKUP_VERSION) return `备份版本 v${b.version} 高于当前支持的 v${BACKUP_VERSION}，请升级应用`
   if (!Array.isArray(b.notes) || !Array.isArray(b.todos)) return '备份数据不完整（notes / todos 缺失）'
+  // 逐元素结构校验（审查 M-19）：缺少 id 会导致 IndexedDB 写入异常
+  for (const n of b.notes as unknown[]) {
+    if (!n || typeof n !== 'object' || typeof (n as Record<string, unknown>).id !== 'string') {
+      return '笔记数据损坏：存在缺少 id 的条目'
+    }
+  }
   return null
 }
 
@@ -104,10 +123,16 @@ export interface ImportResult {
  */
 export async function importBackup(backup: BackupFile, mode: ImportMode): Promise<ImportResult> {
   /* ---------- 笔记（IndexedDB） ---------- */
+  // 时间戳兜底（审查 M-20）：非法值（"not-a-date" / null / NaN）回退为 Date.now()，
+  // 否则 merge 比较 `NaN >= number` 恒为 false，笔记永远不被合并
+  const numTs = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : Date.now())
   const incomingNotes = backup.notes.map((n) => ({
     ...n,
+    id: String(n.id),
     folder: typeof n.folder === 'string' ? n.folder : '',
-    tags: Array.isArray(n.tags) ? n.tags : []
+    tags: Array.isArray(n.tags) ? n.tags.filter((t) => typeof t === 'string') : [],
+    createdAt: numTs(n.createdAt),
+    updatedAt: numTs(n.updatedAt)
   }))
 
   if (mode === 'replace') {
@@ -117,7 +142,7 @@ export async function importBackup(backup: BackupFile, mode: ImportMode): Promis
     const existing = new Map((await storage.listNotes()).map((n) => [n.id, n]))
     const toSave = incomingNotes.filter((n) => {
       const old = existing.get(n.id)
-      return !old || n.updatedAt >= old.updatedAt
+      return !old || n.updatedAt >= (old.updatedAt ?? 0)
     })
     await storage.saveNotes(toSave)
   }
@@ -130,9 +155,11 @@ export async function importBackup(backup: BackupFile, mode: ImportMode): Promis
     write(LS_KEYS.todoCategories, backup.todoCategories ?? [])
     write(LS_KEYS.noteFolders, backup.noteFolders ?? [])
     if (backup.settings) {
-      // 剥离旧版备份可能带的 aiApiKey 字段（新版 Key 单独存储，不受导入影响）
+      const cur = readJson<Record<string, unknown> | null>(LS_KEYS.settings, null)
       const incoming = { ...backup.settings }
       delete incoming.aiApiKey
+      // 不覆盖用户当前的接口地址，防止恶意备份诱导重定向到攻击者服务器（审查 M-25）
+      if (cur?.aiBaseUrl) incoming.aiBaseUrl = cur.aiBaseUrl
       write(LS_KEYS.settings, incoming)
     }
     if (backup.theme) localStorage.setItem(LS_KEYS.theme, backup.theme)
@@ -156,6 +183,11 @@ export async function importBackup(backup: BackupFile, mode: ImportMode): Promis
 /** 从用户选择的文件读取并解析备份 */
 export function readBackupFile(file: File): Promise<BackupFile> {
   return new Promise((resolve, reject) => {
+    // 超大文件（>50MB）一次性读入内存有溢出风险，先拒绝（审查 M-21）
+    if (file.size > 50 * 1024 * 1024) {
+      reject(new Error('备份文件过大（超过 50MB），已拒绝以免内存溢出'))
+      return
+    }
     const reader = new FileReader()
     reader.onload = () => {
       try {

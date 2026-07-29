@@ -76,9 +76,9 @@ function isPreset(cat: string) {
 
 <template>
   <div class="space-y-5 max-w-2xl">
-    <div class="flex items-baseline justify-between">
+      <div class="flex items-baseline justify-between">
       <h2 class="text-xl font-bold m-0">待办 / 任务</h2>
-      <span v-if="progress.total" class="text-sm text-fg-faint">
+      <span v-if="progress.total" class="text-sm text-fg-faint" aria-live="polite">
         {{ progress.done }} / {{ progress.total }} 已完成
       </span>
     </div>
@@ -101,8 +101,12 @@ function isPreset(cat: string) {
         <span
           v-if="!isPreset(cat)"
           @click.stop="delCategory(cat)"
+          @keydown.enter.stop.prevent="delCategory(cat)"
+          role="button"
+          tabindex="0"
           class="i-carbon-close text-xs opacity-0 group-hover/tab:opacity-60 hover:!opacity-100"
           title="删除分类"
+          aria-label="删除分类"
         />
       </button>
 
@@ -190,12 +194,14 @@ function isPreset(cat: string) {
         </button>
       </div>
       <div class="flex items-center gap-4 flex-wrap">
-        <div class="flex items-center gap-1.5">
+        <div class="flex items-center gap-1.5" role="radiogroup" aria-label="优先级">
           <span class="text-xs text-fg-faint">优先级</span>
           <button
             v-for="p in priorities"
             :key="p.value"
             @click="draftPriority = p.value"
+            role="radio"
+            :aria-checked="draftPriority === p.value ? 'true' : 'false'"
             class="pri-btn flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs cursor-pointer"
             :class="draftPriority === p.value ? 'pri-active' : ''"
           >
@@ -228,6 +234,9 @@ function isPreset(cat: string) {
       >
         <button
           @click="store.toggle(t.id)"
+          role="checkbox"
+          :aria-checked="store.isDone(t) ? 'true' : 'false'"
+          :aria-label="`完成任务 ${t.title}`"
           class="check w-5 h-5 rounded-full flex items-center justify-center shrink-0 cursor-pointer"
           :class="store.isDone(t) ? 'check-done' : ''"
         >
@@ -245,6 +254,7 @@ function isPreset(cat: string) {
         <button
           @click="store.remove(t.id)"
           class="del opacity-0 group-hover:opacity-100 text-fg-faint hover:text-red-500 cursor-pointer bg-transparent border-none p-1"
+          aria-label="删除任务"
         >
           <span class="i-carbon-trash-can text-base" />
         </button>

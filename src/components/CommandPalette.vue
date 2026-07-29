@@ -11,6 +11,8 @@ const noteStore = useNoteStore()
 const q = ref('')
 const inputEl = ref<HTMLInputElement>()
 const activeIdx = ref(0)
+/** 打开前聚焦的元素，关闭后恢复（审查 H-10 焦点陷阱） */
+const prevFocus = ref<HTMLElement | null>(null)
 
 const pages = [
   { title: '仪表盘', to: '/', icon: 'i-carbon-dashboard' },
@@ -52,12 +54,16 @@ watch(
   () => props.open,
   async (v) => {
     if (v) {
+      prevFocus.value = document.activeElement as HTMLElement
       q.value = ''
       activeIdx.value = 0
       // 确保笔记已加载（首次直接打开面板搜索的场景）
       if (!noteStore.loaded) noteStore.load()
       await nextTick()
       inputEl.value?.focus()
+    } else {
+      // 关闭后焦点回到触发元素（审查 H-10）
+      prevFocus.value?.focus()
     }
   }
 )
@@ -80,6 +86,12 @@ function onKeydown(e: KeyboardEvent) {
   }
   if (!props.open) return
   if (e.key === 'Escape') emit('update:open', false)
+  // 焦点陷阱（审查 H-10）：面板打开时 Tab 不离开，焦点始终回到输入框
+  if (e.key === 'Tab') {
+    e.preventDefault()
+    inputEl.value?.focus()
+    return
+  }
   const len = items.value.length
   if (e.key === 'ArrowDown') {
     e.preventDefault()

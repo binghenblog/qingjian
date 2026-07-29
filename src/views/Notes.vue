@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import MarkdownIt from 'markdown-it'
 import { useNoteStore } from '@/stores/notes'
+import { md } from '@/services/markdown'
 
 const store = useNoteStore()
-const md = new MarkdownIt({ html: false, linkify: true, typographer: true, breaks: true })
 
 const mode = ref<'edit' | 'preview' | 'split'>('edit')
 const search = ref('')
@@ -32,6 +31,7 @@ function confirmAddFolder() {
   folderDraft.value = ''
 }
 async function delFolder(name: string) {
+  if (!confirm(`删除文件夹「${name}」？该文件夹下的笔记会归入「未分类」`)) return
   await store.removeFolder(name)
   if (activeFolder.value === name) activeFolder.value = '__all'
 }
@@ -146,7 +146,9 @@ async function newNote() {
 }
 
 async function del() {
-  if (store.current) await store.remove(store.current.id)
+  if (store.current && confirm(`删除笔记「${store.current.title || '无标题笔记'}」？此操作不可撤销`)) {
+    await store.remove(store.current.id)
+  }
 }
 
 function onMoveFolder(e: Event) {
@@ -154,20 +156,23 @@ function onMoveFolder(e: Event) {
   if (store.current) store.moveToFolder(store.current.id, v)
 }
 
+/**
+ * 标签增删统一走 store.update（审查 M-2）：不再先 mutate 响应式数组再持久化，
+ * 由 update 在内存与磁盘间原子提交（失败自动回滚），避免两者不一致。
+ */
 function addTag() {
   const t = tagDraft.value.trim()
   if (!t || !store.current) return
-  if (!store.current.tags.includes(t)) store.current.tags.push(t)
+  if (store.current.tags.includes(t)) {
+    tagDraft.value = ''
+    return
+  }
   tagDraft.value = ''
-  persistTags()
+  store.update(store.current.id, { tags: [...store.current.tags, t] })
 }
 function removeTag(t: string) {
   if (!store.current) return
-  store.current.tags = store.current.tags.filter((x) => x !== t)
-  persistTags()
-}
-function persistTags() {
-  if (store.current) store.update(store.current.id, { tags: store.current.tags })
+  store.update(store.current.id, { tags: store.current.tags.filter((x) => x !== t) })
 }
 
 onMounted(() => {
@@ -176,7 +181,16 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="notes-page h-full grid grid-cols-[300px_1fr] gap-5 -m-6 p-6">
+  <div class="notes-page h-full grid grid-cols-1 md:grid-cols-[260px_1fr] lg:grid-cols-[300px_1fr] gap-5 -m-4 md:-m-6 p-4 md:p-6">
+    <!-- IndexedDB 不可用时的降级提示（审查 H-8），避免无限白屏 -->
+    <div
+      v-if="store.loadError"
+      class="md:col-span-2 db-banner flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm"
+      role="alert"
+    >
+      <span class="i-carbon-warning-alt text-base shrink-0" />
+      <span>⚠️ 本地数据库不可用：{{ store.loadError }}</span>
+    </div>
     <!-- 左：笔记列表 -->
     <aside class="list-panel flex flex-col rounded-2xl overflow-hidden">
       <div class="p-3 border-b border-border space-y-2.5">
@@ -192,12 +206,14 @@ onMounted(() => {
               v-if="search"
               @click="search = ''"
               class="clear-btn text-fg-faint hover:text-fg text-xs shrink-0 cursor-pointer"
+              aria-label="清除搜索"
             >✕</button>
           </div>
           <button
             @click="newNote"
             class="new-btn w-9 h-9 flex items-center justify-center shrink-0 cursor-pointer"
             title="新建笔记"
+            aria-label="新建笔记"
           >
             <span class="i-carbon-add text-lg leading-none" />
           </button>
@@ -226,8 +242,12 @@ onMounted(() => {
             <span class="chip-count">{{ store.folderCounts[f] ?? 0 }}</span>
             <span
               @click.stop="delFolder(f)"
+              @keydown.enter.stop.prevent="delFolder(f)"
+              role="button"
+              tabindex="0"
               class="chip-del hidden group-hover:inline text-fg-faint hover:text-red-500"
               title="删除文件夹（笔记归入未分类）"
+              aria-label="删除文件夹"
             >×</span>
           </button>
           <button
@@ -252,11 +272,11 @@ onMounted(() => {
             placeholder="名称"
             class="folder-input w-20 text-xs px-2 py-1 rounded-lg outline-none"
           />
-          <button v-else @click="startAddFolder" class="folder-chip folder-add" title="新建文件夹">
+          <button v-else @click="startAddFolder" class="folder-chip folder-add" title="新建文件夹" aria-label="新建文件夹">
             <span class="i-carbon-add text-[13px]" />
           </button>
         </div>
-        <div v-else class="text-[11px] text-fg-faint px-0.5">
+        <div v-else class="text-[11px] text-fg-faint px-0.5" aria-live="polite">
           在全部 {{ store.notes.length }} 条笔记中搜索，共 {{ filtered.length }} 条匹配
         </div>
       </div>
@@ -266,11 +286,17 @@ onMounted(() => {
           v-for="n in filtered"
           :key="n.id"
           @click="store.select(n.id)"
+          @keydown.enter="store.select(n.id)"
+          @keydown.space.prevent="store.select(n.id)"
+          role="button"
+          tabindex="0"
+          :aria-current="n.id === store.currentId ? 'true' : undefined"
+          :title="n.title + (n.content ? ' — ' + n.content.slice(0, 80) : '')"
           class="note-item px-3 py-2.5 rounded-xl cursor-pointer"
           :class="n.id === store.currentId ? 'note-active' : ''"
         >
           <div class="flex items-center justify-between gap-2">
-            <span class="font-medium text-sm truncate" v-html="highlightTitle(n.title)" />
+            <span class="font-medium text-sm truncate" :title="n.title" v-html="highlightTitle(n.title)" />
             <span class="text-[10px] text-fg-faint shrink-0">{{ fmt(n.updatedAt) }}</span>
           </div>
           <!-- 搜索时显示匹配片段（高亮），否则显示内容预览 -->
@@ -316,11 +342,13 @@ onMounted(() => {
             <option value="">未分类</option>
             <option v-for="f in store.folders" :key="f" :value="f">{{ f }}</option>
           </select>
-          <div class="seg flex items-center rounded-lg p-0.5 shrink-0">
+          <div class="seg flex items-center rounded-lg p-0.5 shrink-0" role="tablist" aria-label="编辑模式">
             <button
               v-for="m in (['edit','split','preview'] as const)"
               :key="m"
               @click="mode = m"
+              role="tab"
+              :aria-selected="mode === m ? 'true' : 'false'"
               class="seg-btn px-2.5 py-1 text-xs rounded-md cursor-pointer"
               :class="mode === m ? 'seg-active' : ''"
             >
@@ -331,6 +359,7 @@ onMounted(() => {
             @click="del"
             class="del-btn w-8 h-8 rounded-lg grid place-items-center text-fg-faint hover:text-red-500 cursor-pointer shrink-0"
             title="删除笔记"
+            aria-label="删除笔记"
           >
             <span class="i-carbon-trash-can text-base" />
           </button>
@@ -340,7 +369,7 @@ onMounted(() => {
         <div class="px-5 py-2 flex items-center gap-1.5 flex-wrap border-b border-border shrink-0">
           <span v-for="t in store.current.tags" :key="t" class="tag-chip">
             {{ t }}
-            <button @click="removeTag(t)" class="ml-0.5 text-fg-faint hover:text-red-500">×</button>
+            <button @click="removeTag(t)" class="ml-0.5 text-fg-faint hover:text-red-500" :aria-label="`移除标签 ${t}`">×</button>
           </span>
           <input
             v-model="tagDraft"
@@ -545,6 +574,18 @@ onMounted(() => {
 .chip {
   background: var(--c-brand-grad);
   box-shadow: 0 6px 20px var(--c-brand-soft);
+}
+
+/* 数据库降级提示（审查 H-8） */
+.db-banner {
+  background: #f59e0b14;
+  border: 1px solid #f59e0b4d;
+  color: #b45309;
+}
+.dark .db-banner {
+  background: #f59e0b1f;
+  border-color: #f59e0b40;
+  color: #fbbf24;
 }
 
 /* Markdown 预览排版 */
