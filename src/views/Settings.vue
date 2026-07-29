@@ -59,12 +59,23 @@ async function onFileChosen(e: Event) {
     busy.value = true
     const backup = await readBackupFile(file)
     const r = await importBackup(backup, importMode.value)
-    dataMsg.value = {
-      type: 'ok',
-      text: `导入成功：笔记 ${r.notes} 条、待办 ${r.todos} 条（${importMode.value === 'merge' ? '合并' : '覆盖'}模式）。点击右侧按钮刷新以载入新数据。`
+    // 导入后主动刷新内存态，避免 UI 继续显示旧数据（审查 H-15 / M-45）
+    try {
+      await noteStore.reload()
+      todoStore.reload()
+      dataMsg.value = {
+        type: 'ok',
+        text: `导入成功：笔记 ${r.notes} 条、待办 ${r.todos} 条（${importMode.value === 'merge' ? '合并' : '覆盖'}模式）。数据已自动刷新。`
+      }
+      needReload.value = false
+    } catch {
+      // 刷新失败（如 IndexedDB 不可用）再退回手动整页刷新
+      dataMsg.value = {
+        type: 'ok',
+        text: `导入成功：笔记 ${r.notes} 条、待办 ${r.todos} 条。点击右侧按钮刷新以载入新数据。`
+      }
+      needReload.value = true
     }
-    // localStorage 数据需重新初始化各 store，最稳妥的方式是整页刷新；改为手动确认（审查 M-31）
-    needReload.value = true
   } catch (err) {
     dataMsg.value = { type: 'err', text: `导入失败：${(err as Error).message}` }
   } finally {

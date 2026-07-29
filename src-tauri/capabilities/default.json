@@ -6,7 +6,6 @@
   "permissions": [
     "core:default",
     "dialog:default",
-    "sql:default",
     "ai_chat",
     "fs:allow-read-text-file",
     "fs:allow-write-text-file",

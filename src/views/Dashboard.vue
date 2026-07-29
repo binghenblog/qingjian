@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTodoStore, dateKey } from '@/stores/todos'
 import { useSettingsStore } from '@/stores/settings'
@@ -12,12 +12,20 @@ const settings = useSettingsStore()
 /** 显示名：设置里可自定义，默认「朋友」 */
 const displayName = computed(() => settings.userName.trim() || '朋友')
 
+/** 响应式时间戳：每分钟刷新一次，跨午夜后日期/问候语自动更新（审查 M-37） */
+const now = ref(new Date())
+let clockTimer: number | undefined
+onMounted(() => {
+  clockTimer = window.setInterval(() => (now.value = new Date()), 60_000)
+})
+onUnmounted(() => clearInterval(clockTimer))
+
 const today = computed(() =>
-  new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' })
+  now.value.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' })
 )
 
 const greeting = computed(() => {
-  const h = new Date().getHours()
+  const h = now.value.getHours()
   if (h < 6) return '夜深了'
   if (h < 12) return '早上好'
   if (h < 14) return '中午好'
@@ -35,15 +43,16 @@ const completionRate = computed(() => (total.value ? Math.round((done.value / to
 
 /** 今日新增 */
 const todayAdded = computed(() => {
-  const start = new Date().setHours(0, 0, 0, 0)
+  const start = new Date(now.value.getFullYear(), now.value.getMonth(), now.value.getDate()).getTime()
   return store.todos.filter((t) => t.createdAt >= start).length
 })
 
-/** 本周每日完成数（周日到周六，按实际完成日期统计） */
+/** 本周每日完成数（周一到周日，按实际完成日期统计，符合中国习惯，审查 L-30） */
 const weekBars = computed(() => {
-  const now = new Date()
-  const base = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const startOfWeek = base.getTime() - base.getDay() * 24 * 60 * 60 * 1000
+  const base = new Date(now.value.getFullYear(), now.value.getMonth(), now.value.getDate())
+  // 距本周一的天数：getDay() 0=周日…6=周六 → (dow + 6) % 7
+  const diffToMonday = (base.getDay() + 6) % 7
+  const startOfWeek = base.getTime() - diffToMonday * 24 * 60 * 60 * 1000
   const bars: number[] = []
   for (let i = 0; i < 7; i++) {
     const d = new Date(startOfWeek + i * 24 * 60 * 60 * 1000)
@@ -56,7 +65,7 @@ const weekBars = computed(() => {
 /** 本周完成总数 */
 const weekDone = computed(() => weekBars.value.reduce((s, b) => s + b.count, 0))
 
-const weekLabels = ['日', '一', '二', '三', '四', '五', '六']
+const weekLabels = ['一', '二', '三', '四', '五', '六', '日']
 
 function addTodo() {
   router.push('/todos')

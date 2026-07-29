@@ -37,3 +37,9 @@ qingjian-data/
 # Vite/临时文件
 *.timestamp-*.mjs
 _tmp_*
+
+# pnpm v11 重建的冗余文件；构建审批已移入 package.json 的 pnpm.onlyBuiltDependencies
+pnpm-workspace.yaml
+
+# pnpm v11 重建的冗余文件；构建审批已移入 package.json 的 pnpm.onlyBuiltDependencies
+pnpm-workspace.yaml

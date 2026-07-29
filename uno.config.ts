@@ -5,6 +5,8 @@ export default defineConfig({
     presetUno(),
     presetIcons({ scale: 1.2, warn: true })
   ],
+  // 阻止 UnoCSS 把 h1/h2/h3 生成为「height」工具类，避免与 HTML 标题语义冲突（审查 M-41）
+  blocklist: ['h1', 'h2', 'h3'],
   theme: {
     colors: {
       // 设计令牌（与 src/styles/theme.css 的 CSS 变量对应）
@@ -14,8 +16,6 @@ export default defineConfig({
       bg: 'var(--c-bg)',
       surface: 'var(--c-surface)',
       'surface-hover': 'var(--c-surface-hover)',
-      // 兼容旧类名
-      'bg-soft': 'var(--c-surface)',
       fg: 'var(--c-fg)',
       'fg-soft': 'var(--c-fg-soft)',
       'fg-faint': 'var(--c-fg-faint)',

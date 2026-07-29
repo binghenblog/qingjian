@@ -74,7 +74,9 @@ function loadTodos(): TodoRecord[] {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated))
     localStorage.setItem(VERSION_KEY, String(TODOS_VERSION))
     return migrated
-  } catch {
+  } catch (e) {
+    // 加载失败不应静默吞掉：至少记录，便于排查数据损坏（审查 L-35）
+    console.error('[todos] 读取本地待办失败', e)
     return []
   }
 }
@@ -116,6 +118,24 @@ export const useTodoStore = defineStore('todos', () => {
       ),
     { deep: true }
   )
+
+  /** 立即同步写入 localStorage，绕过 200ms 防抖，用于页面/窗口关闭前兜底（审查 L-40） */
+  function flushNow() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(todos.value))
+    } catch {
+      /* ignore */
+    }
+  }
+  if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', flushNow)
+  }
+
+  /** 重新从 localStorage 读取（审查 M-46）：备份导入后刷新内存态，避免 UI 显示旧数据 */
+  function reload() {
+    todos.value = loadTodos()
+    categories.value = loadCategories()
+  }
 
   /* ---------- 完成态（每日任务按“今天”判定） ---------- */
 
@@ -278,6 +298,7 @@ export const useTodoStore = defineStore('todos', () => {
     completedCountOn,
     streak,
     streaks,
+    reload,
     add,
     toggle,
     remove,

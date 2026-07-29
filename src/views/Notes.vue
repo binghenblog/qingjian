@@ -1,3 +1,18 @@
+<script lang="ts">
+// 模块级草稿缓存：HMR 热更新时跨组件实例保留未保存编辑，避免开发态丢数据（审查 M-36）
+let _pendingSave: { id: string; title: string; content: string } | null = null
+let _saveTimer: number | undefined
+if (import.meta.hot) {
+  const h = import.meta.hot
+  if (h.data.pendingSave) _pendingSave = h.data.pendingSave
+  if (typeof h.data.saveTimer === 'number') _saveTimer = h.data.saveTimer
+  h.dispose((d) => {
+    d.pendingSave = _pendingSave
+    d.saveTimer = _saveTimer
+  })
+}
+</script>
+
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useNoteStore } from '@/stores/notes'
@@ -97,16 +112,18 @@ const rendered = computed(() => (store.current ? md.render(store.current.content
  * 修复竞态（审查 H-1）：定时器触发时固定使用触发编辑那一刻的笔记 id 与内容快照，
  * 快速切换笔记不会把 A 的内容写进 B；切换笔记时立即冲刷未保存的修改。
  */
-let saveTimer: number | undefined
-let pendingSave: { id: string; title: string; content: string } | null = null
-
-function flushSave() {
-  clearTimeout(saveTimer)
-  if (pendingSave) {
-    const { id, title, content } = pendingSave
-    pendingSave = null
-    store.update(id, { title, content })
-  }
+/**
+ * 自动保存冲刷（审查 H-13 / M-35）：返回 Promise，调用方可 .catch 避免 unhandled rejection。
+ * 真正的草稿状态保存在模块级 _pendingSave（见上方 <script> 块），跨 HMR 实例保留（审查 M-36）。
+ */
+function flushSave(): Promise<void> {
+  clearTimeout(_saveTimer)
+  if (!_pendingSave) return Promise.resolve()
+  const { id, title, content } = _pendingSave
+  _pendingSave = null
+  return store.update(id, { title, content }).catch((e) => {
+    console.error('[notes] 自动保存失败', e)
+  })
 }
 
 let watchedId: string | null = null
@@ -120,19 +137,25 @@ watch(
     }
     // 切换笔记：冲刷上一篇未保存的修改，但「选中」本身不算编辑，不触发保存
     if (c.id !== watchedId) {
-      flushSave()
+      void flushSave()
       watchedId = c.id
       return
     }
-    pendingSave = { id: c.id, title: c.title, content: c.content }
-    clearTimeout(saveTimer)
-    saveTimer = window.setTimeout(flushSave, 500)
+    _pendingSave = { id: c.id, title: c.title, content: c.content }
+    clearTimeout(_saveTimer)
+    _saveTimer = window.setTimeout(flushSave, 500)
   }
 )
 
+/** 窗口/页面关闭前尽量冲刷未保存编辑（审查 H-13）：WebView 直接销毁时 onUnmounted 可能来不及执行 */
+function beforeUnloadFlush() {
+  void flushSave()
+}
+
 onUnmounted(() => {
-  flushSave()
+  void flushSave()
   clearTimeout(searchTimer)
+  window.removeEventListener('beforeunload', beforeUnloadFlush)
 })
 
 function fmt(ts: number) {
@@ -177,6 +200,14 @@ function removeTag(t: string) {
 
 onMounted(() => {
   if (!store.loaded) store.load()
+  window.addEventListener('beforeunload', beforeUnloadFlush)
+  // 桌面端：窗口关闭事件由 Tauri 派发，WebView 销毁前主动冲刷（审查 H-13）
+  const w = window as unknown as { __TAURI__?: unknown }
+  if (w.__TAURI__) {
+    import('@tauri-apps/api/event')
+      .then(({ listen }) => listen('tauri://close-requested', () => void flushSave()))
+      .catch(() => {})
+  }
 })
 </script>
 

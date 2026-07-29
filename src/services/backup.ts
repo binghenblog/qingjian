@@ -135,6 +135,18 @@ export async function importBackup(backup: BackupFile, mode: ImportMode): Promis
     updatedAt: numTs(n.updatedAt)
   }))
 
+  /** 待办字段兜底（审查 L-31）：非法时间戳 / 损坏字段在写入前归一化，避免污染 UI 或比较永远失败 */
+  const PRIORITIES = ['high', 'medium', 'low'] as const
+  const sanitizeTodo = (t: TodoRecord): TodoRecord => ({
+    ...t,
+    id: String(t.id),
+    category: typeof t.category === 'string' && t.category ? t.category : '生活',
+    priority: PRIORITIES.includes(t.priority as (typeof PRIORITIES)[number]) ? t.priority : 'medium',
+    doneDates: Array.isArray(t.doneDates) ? t.doneDates.filter((d) => typeof d === 'string') : undefined,
+    completedAt: typeof t.completedAt === 'number' && Number.isFinite(t.completedAt) ? t.completedAt : undefined,
+    createdAt: numTs(t.createdAt)
+  })
+
   if (mode === 'replace') {
     // 原子替换：清空 + 写入同一事务，中途失败自动回滚，不会出现「清空了却没写进去」（审查 H-5）
     await storage.replaceAllNotes(incomingNotes)
@@ -151,7 +163,7 @@ export async function importBackup(backup: BackupFile, mode: ImportMode): Promis
   const write = (key: string, v: unknown) => localStorage.setItem(key, JSON.stringify(v))
 
   if (mode === 'replace') {
-    write(LS_KEYS.todos, backup.todos)
+    write(LS_KEYS.todos, backup.todos.map(sanitizeTodo))
     write(LS_KEYS.todoCategories, backup.todoCategories ?? [])
     write(LS_KEYS.noteFolders, backup.noteFolders ?? [])
     if (backup.settings) {
@@ -166,7 +178,7 @@ export async function importBackup(backup: BackupFile, mode: ImportMode): Promis
   } else {
     const curTodos = readJson<TodoRecord[]>(LS_KEYS.todos, [])
     const ids = new Set(curTodos.map((t) => t.id))
-    const merged = [...curTodos, ...backup.todos.filter((t) => !ids.has(t.id))]
+    const merged = [...curTodos, ...backup.todos.filter((t) => !ids.has(t.id)).map(sanitizeTodo)]
     write(LS_KEYS.todos, merged)
 
     const mergeList = (key: string, incoming: string[] | undefined) => {

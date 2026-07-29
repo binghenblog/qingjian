@@ -4,11 +4,9 @@
   --c-brand-strong: #0d9488;
   --c-brand-soft: #14b8a61a;
   --c-brand-grad: linear-gradient(135deg, #14b8a6 0%, #0ea5e9 100%);
-  --c-brand-grad-soft: linear-gradient(135deg, #ccfbf1 0%, #e0f2fe 100%);
 
   /* 主视觉蓝（参考工作台风格） */
   --c-hero: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%);
-  --c-hero-soft: #eff6ff;
 
   /* 表面层次：页面底 → 卡片面 → 悬浮面 */
   --c-bg: #f4f6f9;
@@ -33,10 +31,8 @@
   --c-brand-strong: #14b8a6;
   --c-brand-soft: #2dd4bf1f;
   --c-brand-grad: linear-gradient(135deg, #2dd4bf 0%, #38bdf8 100%);
-  --c-brand-grad-soft: linear-gradient(135deg, #134e4a26 0%, #0c4a6e26 100%);
 
   --c-hero: linear-gradient(135deg, #3b82f6 0%, #0ea5e9 100%);
-  --c-hero-soft: #172554;
 
   --c-bg: #0b0f17;
   --c-surface: #151b25;
@@ -141,6 +137,8 @@ a { color: inherit; text-decoration: none; }
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
 }
 .btn-secondary:active:not(:disabled) { transform: translateY(0); }
+/* 暗色主题下保持与浅色一致的白底蓝字（按钮始终位于 Hero 渐变之上，审查 M-40） */
+.dark .btn-secondary { background: rgba(255, 255, 255, 0.92); color: #1d4ed8; }
 
 /* 主按钮 */
 .btn-primary {

@@ -63,6 +63,14 @@ export const useNoteStore = defineStore('notes', () => {
     }
   }
 
+  /** 重新从 IndexedDB 载入（审查 H-16）：备份导入/外部变更后刷新内存态，避免 UI 显示旧数据 */
+  async function reload() {
+    loaded.value = false
+    loadError.value = null
+    folders.value = loadFolders()
+    await load()
+  }
+
   const current = computed(() => notes.value.find((n) => n.id === currentId.value) ?? null)
 
   /** 全部已用过的标签（供联想） */
@@ -121,10 +129,16 @@ export const useNoteStore = defineStore('notes', () => {
       createdAt: now,
       updatedAt: now
     }
-    await storage.saveNote(n)
-    notes.value.unshift(n)
-    currentId.value = n.id
-    return n
+    try {
+      await storage.saveNote(toPlain(n))
+      notes.value.unshift(n)
+      currentId.value = n.id
+      return n
+    } catch (e) {
+      // 写盘失败：不污染内存态，回滚（审查 L-39）
+      lastError.value = `新建笔记失败：${(e as Error).message}`
+      throw e
+    }
   }
 
   /** 最近一次持久化失败信息（供 UI 提示） */
@@ -203,6 +217,7 @@ export const useNoteStore = defineStore('notes', () => {
     folders,
     folderCounts,
     load,
+    reload,
     create,
     update,
     remove,
