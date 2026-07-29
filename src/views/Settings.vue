@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useTheme, type ThemeMode } from '@/composables/useTheme'
 import { useSettingsStore, type AIProviderType } from '@/stores/settings'
 import { useNoteStore } from '@/stores/notes'
@@ -10,6 +11,7 @@ const { theme, setTheme } = useTheme()
 const settings = useSettingsStore()
 const noteStore = useNoteStore()
 const todoStore = useTodoStore()
+const { t } = useI18n()
 
 onMounted(() => noteStore.load())
 
@@ -94,28 +96,28 @@ const shortcuts = [
 ]
 
 const modes: { value: ThemeMode; label: string; icon: string }[] = [
-  { value: 'light', label: '浅色', icon: 'i-carbon-sun' },
-  { value: 'dark', label: '深色', icon: 'i-carbon-moon' },
-  { value: 'system', label: '跟随系统', icon: 'i-carbon-laptop' }
+  { value: 'light', label: 'settings.themeLight', icon: 'i-carbon-sun' },
+  { value: 'dark', label: 'settings.themeDark', icon: 'i-carbon-moon' },
+  { value: 'system', label: 'settings.themeSystem', icon: 'i-carbon-laptop' }
 ]
 
 const channels: { value: AIProviderType; label: string; icon: string }[] = [
-  { value: 'local', label: '本地 Ollama', icon: 'i-carbon-laptop' },
-  { value: 'cloud', label: '云端兼容', icon: 'i-carbon-cloud' }
+  { value: 'local', label: 'settings.channelLocal', icon: 'i-carbon-laptop' },
+  { value: 'cloud', label: 'settings.channelCloud', icon: 'i-carbon-cloud' }
 ]
 </script>
 
 <template>
   <div class="space-y-5 max-w-2xl">
-    <h2 class="text-xl font-bold m-0">设置</h2>
+    <h2 class="text-xl font-bold m-0">{{ t('settings.title') }}</h2>
 
     <!-- 个人资料 -->
     <section class="setting-card rounded-2xl p-5">
-      <div class="font-semibold text-sm mb-1">个人资料</div>
-      <p class="text-xs text-fg-faint mt-0 mb-3">仪表盘问候语中显示的名字，仅存本机</p>
+      <div class="font-semibold text-sm mb-1">{{ t('settings.profile') }}</div>
+      <p class="text-xs text-fg-faint mt-0 mb-3">{{ t('settings.profileHint') }}</p>
       <input
         v-model="settings.userName"
-        placeholder="输入你的名字，如：冰痕"
+        :placeholder="t('settings.namePlaceholder')"
         class="input-modern w-full max-w-xs px-3 py-2 text-sm"
         maxlength="12"
       />
@@ -123,9 +125,9 @@ const channels: { value: AIProviderType; label: string; icon: string }[] = [
 
     <!-- 外观 -->
     <section class="setting-card rounded-2xl p-5">
-      <div class="font-semibold text-sm mb-1">外观</div>
-      <p class="text-xs text-fg-faint mt-0 mb-4">选择界面主题模式</p>
-      <div class="seg inline-flex p-1 rounded-xl gap-1" role="radiogroup" aria-label="主题模式">
+      <div class="font-semibold text-sm mb-1">{{ t('settings.appearance') }}</div>
+      <p class="text-xs text-fg-faint mt-0 mb-4">{{ t('settings.appearanceHint') }}</p>
+      <div class="seg inline-flex p-1 rounded-xl gap-1" role="radiogroup" :aria-label="t('settings.themeAria')">
         <button
           v-for="m in modes"
           :key="m.value"
@@ -136,7 +138,7 @@ const channels: { value: AIProviderType; label: string; icon: string }[] = [
           :class="theme === m.value ? 'seg-active' : ''"
         >
           <span :class="m.icon" class="text-base" />
-          {{ m.label }}
+          {{ t(m.label) }}
         </button>
       </div>
     </section>
@@ -144,9 +146,9 @@ const channels: { value: AIProviderType; label: string; icon: string }[] = [
     <!-- AI 通道 -->
     <section class="setting-card rounded-2xl p-5 space-y-4">
       <div>
-        <div class="font-semibold text-sm mb-1">AI 通道</div>
-        <p class="text-xs text-fg-faint mt-0 mb-3">选择本地或云端模型，配置保存在本地</p>
-      <div class="seg inline-flex p-1 rounded-xl gap-1" role="radiogroup" aria-label="AI 通道">
+        <div class="font-semibold text-sm mb-1">{{ t('settings.aiTitle') }}</div>
+        <p class="text-xs text-fg-faint mt-0 mb-3">{{ t('settings.aiHint') }}</p>
+      <div class="seg inline-flex p-1 rounded-xl gap-1" role="radiogroup" :aria-label="t('settings.aiTitle')">
         <button
           v-for="c in channels"
           :key="c.value"
@@ -157,14 +159,14 @@ const channels: { value: AIProviderType; label: string; icon: string }[] = [
           :class="settings.aiProvider === c.value ? 'seg-active' : ''"
         >
           <span :class="c.icon" class="text-base" />
-          {{ c.label }}
+          {{ t(c.label) }}
         </button>
       </div>
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <label class="field">
-          <span class="field-label">接口地址</span>
+          <span class="field-label">{{ t('settings.fieldAddress') }}</span>
           <input
             v-model="settings.aiBaseUrl"
             class="input-modern w-full px-3 py-2 text-sm"
@@ -172,7 +174,7 @@ const channels: { value: AIProviderType; label: string; icon: string }[] = [
           />
         </label>
         <label class="field">
-          <span class="field-label">模型</span>
+          <span class="field-label">{{ t('settings.fieldModel') }}</span>
           <input
             v-model="settings.aiModel"
             class="input-modern w-full px-3 py-2 text-sm"
@@ -182,7 +184,7 @@ const channels: { value: AIProviderType; label: string; icon: string }[] = [
       </div>
 
       <div v-if="settings.aiProvider === 'cloud'" class="field">
-        <span class="field-label">API Key</span>
+        <span class="field-label">{{ t('settings.fieldApiKey') }}</span>
         <input
           v-model="settings.aiApiKey"
           type="password"
@@ -191,10 +193,10 @@ const channels: { value: AIProviderType; label: string; icon: string }[] = [
         />
         <label class="flex items-center gap-2 text-xs text-fg-soft mt-2 cursor-pointer select-none">
           <input v-model="settings.aiKeyRemember" type="checkbox" class="cursor-pointer" />
-          在本机记住密钥（写入 localStorage；不勾选则关闭浏览器即清除）
+          {{ t('settings.rememberKey') }}
         </label>
         <p class="field-hint">
-          ⚠️ 密钥仅保存在本机浏览器，默认只在当前会话有效。纯 Web 端直连云端可能受 CORS 限制；桌面版将经本地后端中转并加密保管，更安全。
+          {{ t('settings.keyHint') }}
         </p>
       </div>
     </section>
@@ -202,25 +204,24 @@ const channels: { value: AIProviderType; label: string; icon: string }[] = [
     <!-- 数据与存储 -->
     <section class="setting-card rounded-2xl p-5 space-y-4">
       <div>
-        <div class="font-semibold text-sm mb-1">数据与存储</div>
+        <div class="font-semibold text-sm mb-1">{{ t('settings.dataTitle') }}</div>
         <p class="text-xs text-fg-faint mt-0 mb-0">
-          当前本机数据：<b class="text-fg">{{ noteCount }}</b> 条笔记 ·
-          <b class="text-fg">{{ todoCount }}</b> 条待办。备份为 JSON 文件，可跨设备恢复。
+          {{ t('settings.dataHint', { notes: noteCount, todos: todoCount }) }}
         </p>
       </div>
 
       <div class="flex flex-wrap items-center gap-2">
         <button class="btn-primary px-4 py-2 rounded-xl text-sm flex items-center gap-1.5" :disabled="busy" @click="onExport">
           <span class="i-carbon-download text-base" />
-          导出备份
+          {{ t('settings.exportBtn') }}
         </button>
         <button class="data-btn px-4 py-2 rounded-xl text-sm flex items-center gap-1.5" :disabled="busy" @click="pickFile('merge')">
           <span class="i-carbon-upload text-base" />
-          导入（合并）
+          {{ t('settings.importMerge') }}
         </button>
         <button class="data-btn data-btn-danger px-4 py-2 rounded-xl text-sm flex items-center gap-1.5" :disabled="busy" @click="pickFile('replace')">
           <span class="i-carbon-warning-alt text-base" />
-          导入（覆盖）
+          {{ t('settings.importReplace') }}
         </button>
         <input ref="fileInput" type="file" accept=".json,application/json" class="hidden" @change="onFileChosen" />
       </div>
@@ -232,16 +233,16 @@ const channels: { value: AIProviderType; label: string; icon: string }[] = [
         v-if="needReload"
         @click="reload"
         class="btn-primary px-4 py-2 rounded-xl text-sm"
-      >刷新页面载入新数据</button>
+      >{{ t('settings.reloadBtn') }}</button>
       <p class="field-hint m-0">
-        合并：按 id 去重，同一笔记保留较新版本；覆盖：清空当前数据后整体恢复（会先确认）。备份不包含 API Key。
+        {{ t('settings.backupHint') }}
       </p>
     </section>
 
     <!-- 快捷键 -->
     <section class="setting-card rounded-2xl p-5">
-      <div class="font-semibold text-sm mb-1">快捷键</div>
-      <p class="text-xs text-fg-faint mt-0 mb-4">随时随地快速跳转</p>
+      <div class="font-semibold text-sm mb-1">{{ t('settings.shortcutTitle') }}</div>
+      <p class="text-xs text-fg-faint mt-0 mb-4">{{ t('settings.shortcutHint') }}</p>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <div v-for="s in shortcuts" :key="s.desc" class="flex items-center justify-between px-3 py-2 rounded-xl kbd-row">
           <span class="text-sm text-fg-soft">{{ s.desc }}</span>
@@ -256,8 +257,8 @@ const channels: { value: AIProviderType; label: string; icon: string }[] = [
     <section class="setting-card rounded-2xl p-5 flex items-center gap-4">
       <span class="logo w-11 h-11 rounded-xl grid place-items-center text-white text-lg font-bold shrink-0">青</span>
       <div>
-        <div class="font-semibold text-sm">青简 QingJian</div>
-        <div class="text-xs text-fg-faint mt-0.5">v0.1.0 · 轻量 · 现代 · 开源 · 本地优先 · MIT License</div>
+        <div class="font-semibold text-sm">{{ t('app.name') }} QingJian</div>
+        <div class="text-xs text-fg-faint mt-0.5">{{ t('about.desc') }}</div>
       </div>
     </section>
   </div>
@@ -285,7 +286,7 @@ const channels: { value: AIProviderType; label: string; icon: string }[] = [
 .seg-item {
   background: transparent;
   color: var(--c-fg-soft);
-  transition: all 0.15s ease;
+  transition: color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
 }
 .seg-item:hover { color: var(--c-fg); }
 .seg-active {
@@ -307,7 +308,7 @@ const channels: { value: AIProviderType; label: string; icon: string }[] = [
   border: 1px solid var(--c-border);
   color: var(--c-fg-soft);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
 }
 .data-btn:hover:not(:disabled) {
   color: var(--c-fg);

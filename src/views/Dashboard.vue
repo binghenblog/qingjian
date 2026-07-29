@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useTodoStore, dateKey } from '@/stores/todos'
 import { useSettingsStore } from '@/stores/settings'
 import TodoBadges from '@/components/TodoBadges.vue'
@@ -9,6 +10,7 @@ import { DAILY_CATEGORY } from '@/types'
 const router = useRouter()
 const store = useTodoStore()
 const settings = useSettingsStore()
+const { t } = useI18n()
 /** 显示名：设置里可自定义，默认「朋友」 */
 const displayName = computed(() => settings.userName.trim() || '朋友')
 
@@ -26,11 +28,11 @@ const today = computed(() =>
 
 const greeting = computed(() => {
   const h = now.value.getHours()
-  if (h < 6) return '夜深了'
-  if (h < 12) return '早上好'
-  if (h < 14) return '中午好'
-  if (h < 18) return '下午好'
-  return '晚上好'
+  if (h < 6) return 'dashboard.greetingNight'
+  if (h < 12) return 'dashboard.greetingMorning'
+  if (h < 14) return 'dashboard.greetingNoon'
+  if (h < 18) return 'dashboard.greetingAfternoon'
+  return 'dashboard.greetingEvening'
 })
 
 /** 今日待办：未完成（每日任务按今天判定、优先展示），最多 6 条 */
@@ -84,17 +86,17 @@ function addProgress() {
       <div>
         <div class="text-xs font-medium text-fg-faint tracking-wide mb-1">{{ today }}</div>
         <h1 class="text-2xl font-bold m-0 tracking-tight">
-          {{ greeting }}，<span class="grad-text">{{ displayName }}</span>
+          {{ t(greeting) }}，<span class="grad-text">{{ displayName }}</span>
         </h1>
       </div>
       <div class="flex items-center gap-2.5">
         <button @click="addTodo" class="action-btn flex items-center gap-1.5 px-3.5 py-2 text-sm">
           <span class="i-carbon-add text-base" />
-          新工作
+          {{ t('dashboard.newWork') }}
         </button>
         <button @click="addProgress" class="btn-primary flex items-center gap-1.5 px-4 py-2 text-sm">
           <span class="i-carbon-edit text-base" />
-          记一笔进展
+          {{ t('dashboard.logProgress') }}
         </button>
       </div>
     </div>
@@ -102,18 +104,18 @@ function addProgress() {
     <!-- Hero 主视觉卡片 -->
     <section class="hero-card relative p-7 min-h-[180px] flex flex-col justify-between">
       <div class="relative z-10 max-w-lg">
-        <div class="text-xs font-medium text-blue-100/80 mb-2">今天，只要记录真正重要的事</div>
+        <div class="text-xs font-medium text-blue-100/80 mb-2">{{ t('dashboard.heroHint') }}</div>
         <h2 class="text-2xl sm:text-3xl font-bold m-0 leading-snug">
-          把混乱编译成秩序。
+          {{ t('dashboard.heroTitle') }}
         </h2>
         <p class="text-sm text-blue-50/90 mt-2 mb-0 leading-relaxed">
-          每一次记录，都会进入你的周报、成果库与技能轨迹。
+          {{ t('dashboard.heroSub') }}
         </p>
       </div>
       <div class="relative z-10 mt-5">
         <button @click="addProgress" class="btn-secondary flex items-center gap-1.5 px-4 py-2 text-sm">
           <span class="i-carbon-edit text-base" />
-          记下刚刚的进展
+          {{ t('dashboard.heroCta') }}
         </button>
       </div>
     </section>
@@ -125,19 +127,19 @@ function addProgress() {
         <div class="flex items-center justify-between mb-4">
           <div class="flex items-center gap-2">
             <span class="text-xs font-bold text-fg-faint tracking-wider">TODAY</span>
-            <span class="font-semibold">今天要推进</span>
+            <span class="font-semibold">{{ t('dashboard.todayPush') }}</span>
             <span v-if="total" class="text-xs text-fg-faint">
-              {{ done }} / {{ total }} 已完成
+              {{ t('dashboard.doneOf', { done, total }) }}
             </span>
             <span v-if="store.yesterdayMissed > 0" class="missed-chip text-[11px] px-2 py-0.5 rounded-full">
-              昨日遗留 {{ store.yesterdayMissed }} 项
+              {{ t('dashboard.yesterdayMissed', { n: store.yesterdayMissed }) }}
             </span>
           </div>
           <button
             @click="router.push('/todos')"
             class="text-xs text-fg-faint hover:text-brand cursor-pointer bg-transparent border-none flex items-center gap-1"
           >
-            全部待办
+            {{ t('dashboard.allTodos') }}
             <span class="i-carbon-arrow-right" />
           </button>
         </div>
@@ -173,7 +175,7 @@ function addProgress() {
           <div>
             <span class="i-carbon-checkmark-outline text-3xl text-fg-faint" />
             <p class="text-sm text-fg-faint mt-2 mb-0">
-              {{ total ? '所有待办都完成了，干得漂亮 🎉' : '暂无待办，从右上角添加第一项吧' }}
+              {{ total ? t('dashboard.emptyDone') : t('dashboard.emptyNone') }}
             </p>
           </div>
         </div>
@@ -182,22 +184,22 @@ function addProgress() {
       <!-- 右侧：本周整体进展 -->
       <section class="panel lg:col-span-2 rounded-2xl p-5 flex flex-col">
         <div class="flex items-center justify-between mb-5">
-          <span class="font-semibold">本周整体进展</span>
-          <span class="text-xs text-fg-faint">最近 7 天</span>
+          <span class="font-semibold">{{ t('dashboard.weekProgress') }}</span>
+          <span class="text-xs text-fg-faint">{{ t('dashboard.recent7') }}</span>
         </div>
 
         <div class="grid grid-cols-3 gap-3 mb-5">
           <div class="stat-cell rounded-xl p-3 text-center">
             <div class="text-2xl font-bold text-fg">{{ todayAdded }}</div>
-            <div class="text-[11px] text-fg-faint mt-0.5">今日新增</div>
+            <div class="text-[11px] text-fg-faint mt-0.5">{{ t('dashboard.todayAdded') }}</div>
           </div>
           <div class="stat-cell rounded-xl p-3 text-center">
             <div class="text-2xl font-bold text-fg">{{ weekDone }}</div>
-            <div class="text-[11px] text-fg-faint mt-0.5">本周完成</div>
+            <div class="text-[11px] text-fg-faint mt-0.5">{{ t('dashboard.weekDone') }}</div>
           </div>
           <div class="stat-cell rounded-xl p-3 text-center">
             <div class="text-2xl font-bold text-brand-strong">{{ completionRate }}%</div>
-            <div class="text-[11px] text-fg-faint mt-0.5">完成率</div>
+            <div class="text-[11px] text-fg-faint mt-0.5">{{ t('dashboard.completionRate') }}</div>
           </div>
         </div>
 
@@ -209,7 +211,7 @@ function addProgress() {
           >
             <div class="bar-track w-full rounded-t-md relative" style="height: 84px;">
               <div
-                class="bar-fill absolute bottom-0 left-0 right-0 rounded-t-md transition-all duration-500"
+                class="bar-fill absolute bottom-0 left-0 right-0 rounded-t-md transition-width duration-500"
                 :style="{ height: bar.height }"
               />
             </div>
@@ -223,9 +225,9 @@ function addProgress() {
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
       <button
         v-for="c in [
-          { title: '笔记', desc: '本地优先的知识库', to: '/notes', icon: 'i-carbon-document', hue: 'card-teal' },
-          { title: '待办', desc: 'GTD 风格任务管理', to: '/todos', icon: 'i-carbon-task', hue: 'card-blue' },
-          { title: 'AI 助手', desc: '云端 / 本地双通道', to: '/ai', icon: 'i-carbon-ai-status', hue: 'card-violet' }
+          { title: 'dashboard.featureNotes', desc: 'dashboard.featureNotesDesc', to: '/notes', icon: 'i-carbon-document', hue: 'card-teal' },
+          { title: 'dashboard.featureTodos', desc: 'dashboard.featureTodosDesc', to: '/todos', icon: 'i-carbon-task', hue: 'card-blue' },
+          { title: 'dashboard.featureAi', desc: 'dashboard.featureAiDesc', to: '/ai', icon: 'i-carbon-ai-status', hue: 'card-violet' }
         ]"
         :key="c.to"
         @click="router.push(c.to)"
@@ -234,8 +236,8 @@ function addProgress() {
         <span class="icon-chip grid place-items-center w-9 h-9 rounded-lg mb-3" :class="c.hue">
           <span :class="c.icon" class="text-lg" />
         </span>
-        <div class="font-semibold text-sm">{{ c.title }}</div>
-        <div class="text-xs text-fg-soft mt-0.5">{{ c.desc }}</div>
+        <div class="font-semibold text-sm">{{ t(c.title) }}</div>
+        <div class="text-xs text-fg-soft mt-0.5">{{ t(c.desc) }}</div>
       </button>
     </div>
 
@@ -284,7 +286,7 @@ function addProgress() {
 .check {
   border: 2px solid var(--c-border);
   background: transparent;
-  transition: all 0.15s ease;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 .check:hover {
   border-color: var(--c-brand);
@@ -344,7 +346,7 @@ function addProgress() {
 .card-blue { background: linear-gradient(135deg, #38bdf8, #2563eb); }
 .card-violet { background: linear-gradient(135deg, #a78bfa, #7c3aed); }
 
-.list-enter-active, .list-leave-active { transition: all 0.2s ease; }
+.list-enter-active, .list-leave-active { transition: transform 0.2s ease, opacity 0.2s ease; }
 .list-enter-from { opacity: 0; transform: translateY(-6px); }
 .list-leave-to { opacity: 0; transform: translateX(10px); }
 </style>

@@ -499,7 +499,7 @@ onMounted(() => {
   background: var(--c-bg);
   color: var(--c-fg-soft);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
 }
 .folder-chip:hover { border-color: var(--c-brand); color: var(--c-brand-strong); }
 .folder-active {
@@ -576,7 +576,7 @@ onMounted(() => {
 .folder-select:hover { border-color: var(--c-brand); }
 
 .seg { background: var(--c-bg); border: 1px solid var(--c-border); }
-.seg-btn { color: var(--c-fg-soft); transition: all 0.15s ease; }
+.seg-btn { color: var(--c-fg-soft); transition: color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease; }
 .seg-active { background: var(--c-surface); color: var(--c-brand-strong); font-weight: 600; box-shadow: var(--shadow-sm); }
 .dark .seg-active { color: var(--c-brand); }
 

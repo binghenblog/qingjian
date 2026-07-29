@@ -22,6 +22,10 @@
   --shadow-md: 0 4px 12px rgba(16, 24, 40, 0.08), 0 2px 4px rgba(16, 24, 40, 0.04);
   --shadow-lg: 0 12px 32px rgba(16, 24, 40, 0.14), 0 4px 8px rgba(16, 24, 40, 0.06);
 
+  /* 主题化彩色阴影：暗色单独适配（审查 L-32） */
+  --c-hero-shadow: 0 12px 32px rgba(37, 99, 235, 0.28), 0 4px 10px rgba(37, 99, 235, 0.16);
+  --c-brand-shadow-hover: 0 4px 14px rgba(20, 184, 166, 0.35);
+
   --radius: 12px;
   --radius-lg: 16px;
 }
@@ -45,6 +49,10 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.55);
+
+  /* 暗色下增强彩色阴影对比（审查 L-32） */
+  --c-hero-shadow: 0 12px 32px rgba(56, 130, 246, 0.45), 0 4px 12px rgba(56, 130, 246, 0.3);
+  --c-brand-shadow-hover: 0 4px 16px rgba(45, 212, 191, 0.45);
 }
 
 * { box-sizing: border-box; }
@@ -106,7 +114,7 @@ a { color: inherit; text-decoration: none; }
   background: var(--c-hero);
   border-radius: var(--radius-lg);
   color: #fff;
-  box-shadow: 0 12px 32px rgba(37, 99, 235, 0.28), 0 4px 10px rgba(37, 99, 235, 0.16);
+  box-shadow: var(--c-hero-shadow);
   position: relative;
   overflow: hidden;
 }
@@ -154,7 +162,7 @@ a { color: inherit; text-decoration: none; }
 .btn-primary:hover:not(:disabled) {
   opacity: 0.92;
   transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgba(20, 184, 166, 0.35);
+  box-shadow: var(--c-brand-shadow-hover);
 }
 .btn-primary:active:not(:disabled) { transform: translateY(0); }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }

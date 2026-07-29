@@ -1,18 +1,20 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import CommandPalette from '@/components/CommandPalette.vue'
 import { useShortcuts } from '@/composables/useShortcuts'
 
 useShortcuts()
 const route = useRoute()
 const paletteOpen = ref(false)
+const { t } = useI18n()
 
 const nav = [
-  { to: '/', label: '今日桌面', icon: 'i-carbon-dashboard' },
-  { to: '/notes', label: '笔记', icon: 'i-carbon-document' },
-  { to: '/todos', label: '待办', icon: 'i-carbon-task' },
-  { to: '/ai', label: 'AI 助手', icon: 'i-carbon-ai-status' }
+  { to: '/', key: 'nav.dashboard', icon: 'i-carbon-dashboard' },
+  { to: '/notes', key: 'nav.notes', icon: 'i-carbon-document' },
+  { to: '/todos', key: 'nav.todos', icon: 'i-carbon-task' },
+  { to: '/ai', key: 'nav.ai', icon: 'i-carbon-ai-status' }
 ]
 
 function openPalette() {
@@ -28,8 +30,8 @@ function openPalette() {
       <div class="flex items-center gap-3 px-1 py-2 md:mb-6 shrink-0">
         <span class="logo-mark w-9 h-9 rounded-xl text-white grid place-items-center text-base font-bold shrink-0">青</span>
         <div class="leading-tight hidden md:block">
-          <div class="font-bold text-base tracking-wide">青简</div>
-          <div class="text-[11px] text-fg-faint">个人工作台</div>
+          <div class="font-bold text-base tracking-wide">{{ t('app.name') }}</div>
+          <div class="text-[11px] text-fg-faint">{{ t('app.tagline') }}</div>
         </div>
       </div>
 
@@ -41,10 +43,10 @@ function openPalette() {
           :to="n.to"
           class="nav-item flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-fg-soft"
           active-class="nav-active"
-          :aria-label="n.label"
+          :aria-label="t(n.key)"
         >
           <span :class="n.icon" class="text-lg shrink-0" />
-          <span class="hidden sm:inline">{{ n.label }}</span>
+          <span class="hidden sm:inline">{{ t(n.key) }}</span>
         </RouterLink>
       </nav>
 
@@ -53,10 +55,10 @@ function openPalette() {
         <button
           class="search-trigger flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-fg-faint cursor-pointer"
           @click="openPalette"
-          aria-label="快速搜索（Ctrl/Cmd + K）"
+          :aria-label="t('nav.searchAria')"
         >
           <span class="i-carbon-search text-base" />
-          <span class="hidden sm:inline">快速搜索</span>
+          <span class="hidden sm:inline">{{ t('nav.search') }}</span>
           <kbd class="hidden md:inline ml-auto">⌘K</kbd>
         </button>
 
@@ -64,15 +66,15 @@ function openPalette() {
           to="/settings"
           class="nav-item flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-fg-soft"
           active-class="nav-active"
-          aria-label="设置"
+          :aria-label="t('nav.settings')"
         >
           <span class="i-carbon-settings text-lg shrink-0" />
-          <span class="hidden sm:inline">设置</span>
+          <span class="hidden sm:inline">{{ t('nav.settings') }}</span>
         </RouterLink>
 
         <div class="hidden md:flex px-3 py-1.5 text-[11px] text-fg-faint items-center gap-1.5">
           <span class="w-1.5 h-1.5 rounded-full bg-brand inline-block" />
-          v0.1.0
+          {{ t('app.version') }}
         </div>
       </div>
     </aside>
@@ -81,8 +83,8 @@ function openPalette() {
     <main class="flex-1 overflow-hidden p-4 md:p-5">
       <div class="card h-full flex flex-col overflow-hidden">
         <header class="h-14 px-4 md:px-6 flex items-center justify-between border-b border-border shrink-0">
-          <span class="font-semibold truncate">{{ route.meta.title || '青简' }}</span>
-          <span class="text-xs text-fg-faint hidden sm:inline">本地优先 · 数据在你手中</span>
+          <span class="font-semibold truncate">{{ route.meta.title || t('app.name') }}</span>
+          <span class="text-xs text-fg-faint hidden sm:inline">{{ t('app.footer') }}</span>
         </header>
         <div class="flex-1 overflow-auto p-4 md:p-6">
           <slot />

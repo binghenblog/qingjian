@@ -53,10 +53,19 @@ export function dateKey(d = new Date()): string {
   return `${y}-${m}-${day}`
 }
 
+/**
+ * 计算给定 YYYY-MM-DD 的前一天（纯日历日运算，DST 安全）。
+ * 以正午为锚点创建 Date，规避春令时「当天不存在 00:00」的边界（审查 L-28）。
+ */
+export function prevDayKey(key: string): string {
+  const [y, m, d] = key.split('-').map(Number)
+  const dt = new Date(y, m - 1, d, 12, 0, 0)
+  dt.setDate(dt.getDate() - 1)
+  return dateKey(dt)
+}
+
 export function yesterdayKey(): string {
-  const d = new Date()
-  d.setDate(d.getDate() - 1)
-  return dateKey(d)
+  return prevDayKey(dateKey())
 }
 
 function loadTodos(): TodoRecord[] {
@@ -168,13 +177,14 @@ export const useTodoStore = defineStore('todos', () => {
 
   /** 昨日未完成的每日任务数（任务需在昨天前创建才计入） */
   const yesterdayMissed = computed(() => {
-    const yk = yesterdayKey()
-    const endOfYesterday = new Date()
-    endOfYesterday.setHours(0, 0, 0, 0) // 今天 0 点 = 昨天结束
+    const now = new Date()
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+    // 与 startOfToday 同源的单一 now，避免两次 new Date() 跨越午夜导致判定不一致（审查 L-29）
+    const yk = prevDayKey(dateKey(now))
     return todos.value.filter(
       (t) =>
         t.category === DAILY_CATEGORY &&
-        t.createdAt < endOfYesterday.getTime() &&
+        t.createdAt < startOfToday &&
         !(t.doneDates ?? []).includes(yk)
     ).length
   })
@@ -192,12 +202,13 @@ export const useTodoStore = defineStore('todos', () => {
   function streak(t: TodoRecord): number {
     if (t.category !== DAILY_CATEGORY) return 0
     const set = new Set(t.doneDates ?? [])
+    // 纯日历日字符串回溯，杜绝 DST 切换 / 午夜边界导致的日期错位（审查 L-28）
+    let key = dateKey()
+    if (!set.has(key)) key = prevDayKey(key) // 今天没做，从昨天回溯
     let n = 0
-    const d = new Date()
-    if (!set.has(dateKey(d))) d.setDate(d.getDate() - 1) // 今天没做，从昨天回溯
-    while (set.has(dateKey(d))) {
+    while (set.has(key)) {
       n++
-      d.setDate(d.getDate() - 1)
+      key = prevDayKey(key)
     }
     return n
   }

@@ -156,7 +156,7 @@ function isPreset(cat: string) {
         </div>
         <div class="track h-2 rounded-full overflow-hidden">
           <div
-            class="fill h-full rounded-full transition-all duration-500"
+            class="fill h-full rounded-full transition-width duration-500"
             :class="progress.rate === 100 ? 'fill-complete' : ''"
             :style="{ width: progress.rate + '%' }"
           />
@@ -172,7 +172,7 @@ function isPreset(cat: string) {
       </div>
       <div class="track h-2 rounded-full overflow-hidden">
         <div
-          class="fill h-full rounded-full transition-all duration-500"
+          class="fill h-full rounded-full transition-width duration-500"
           :class="progress.rate === 100 ? 'fill-complete' : ''"
           :style="{ width: progress.rate + '%' }"
         />
@@ -242,7 +242,7 @@ function isPreset(cat: string) {
         >
           <span v-if="store.isDone(t)" class="i-carbon-checkmark text-[13px] leading-none text-white" />
         </button>
-        <span class="flex-1 text-sm transition-all" :class="store.isDone(t) ? 'line-through text-fg-faint' : ''">
+        <span class="flex-1 text-sm transition-colors" :class="store.isDone(t) ? 'line-through text-fg-faint' : ''">
           {{ t.title }}
         </span>
         <!-- 每日任务连续打卡 -->
@@ -296,7 +296,7 @@ export default {
   border: 1px solid var(--c-border);
   color: var(--c-fg-soft);
   font-weight: 500;
-  transition: all 0.15s ease;
+  transition: border-color 0.15s ease, color 0.15s ease;
 }
 .cat-tab:hover {
   border-color: var(--c-brand);
@@ -375,7 +375,7 @@ export default {
   background: var(--c-bg);
   border: 1px solid var(--c-border);
   color: var(--c-fg-soft);
-  transition: all 0.15s ease;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
 }
 .pri-btn:hover { color: var(--c-fg); }
 .pri-active {
@@ -399,7 +399,7 @@ export default {
 .check {
   border: 2px solid var(--c-border);
   background: transparent;
-  transition: all 0.15s ease;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 .check:hover { border-color: var(--c-brand); }
 .check-done {
@@ -411,7 +411,7 @@ export default {
 
 .empty { border: 1.5px dashed var(--c-border); }
 
-.list-enter-active, .list-leave-active { transition: all 0.2s ease; }
+.list-enter-active, .list-leave-active { transition: transform 0.2s ease, opacity 0.2s ease; }
 .list-enter-from { opacity: 0; transform: translateY(-8px); }
 .list-leave-to { opacity: 0; transform: translateX(12px); }
 </style>
