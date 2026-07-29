@@ -1,18 +1,23 @@
 :root {
-  /* 品牌色 */
+  /* 品牌色：青 + 天蓝 */
   --c-brand: #14b8a6;
   --c-brand-strong: #0d9488;
   --c-brand-soft: #14b8a61a;
   --c-brand-grad: linear-gradient(135deg, #14b8a6 0%, #0ea5e9 100%);
+  --c-brand-grad-soft: linear-gradient(135deg, #ccfbf1 0%, #e0f2fe 100%);
+
+  /* 主视觉蓝（参考工作台风格） */
+  --c-hero: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%);
+  --c-hero-soft: #eff6ff;
 
   /* 表面层次：页面底 → 卡片面 → 悬浮面 */
-  --c-bg: #f5f6f8;
+  --c-bg: #f4f6f9;
   --c-surface: #ffffff;
-  --c-surface-hover: #f0f2f5;
-  --c-fg: #18212f;
-  --c-fg-soft: #64748b;
-  --c-fg-faint: #94a3b8;
-  --c-border: #e6e8ee;
+  --c-surface-hover: #f1f4f8;
+  --c-fg: #111827;
+  --c-fg-soft: #4b5563;
+  --c-fg-faint: #9ca3af;
+  --c-border: #e5e7eb;
 
   /* 阴影 */
   --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06);
@@ -28,14 +33,18 @@
   --c-brand-strong: #14b8a6;
   --c-brand-soft: #2dd4bf1f;
   --c-brand-grad: linear-gradient(135deg, #2dd4bf 0%, #38bdf8 100%);
+  --c-brand-grad-soft: linear-gradient(135deg, #134e4a26 0%, #0c4a6e26 100%);
 
-  --c-bg: #0e1117;
-  --c-surface: #161a22;
-  --c-surface-hover: #1d222c;
-  --c-fg: #e7eaf0;
-  --c-fg-soft: #9aa4b2;
-  --c-fg-faint: #64748b;
-  --c-border: #262c37;
+  --c-hero: linear-gradient(135deg, #3b82f6 0%, #0ea5e9 100%);
+  --c-hero-soft: #172554;
+
+  --c-bg: #0b0f17;
+  --c-surface: #151b25;
+  --c-surface-hover: #1c2330;
+  --c-fg: #f3f4f6;
+  --c-fg-soft: #9ca3af;
+  --c-fg-faint: #6b7280;
+  --c-border: #253046;
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
@@ -89,6 +98,43 @@ body, .card, aside, header, input, button {
   border-color: var(--c-brand);
   box-shadow: 0 0 0 3px var(--c-brand-soft);
 }
+
+/* Hero 主视觉卡片 */
+.hero-card {
+  background: var(--c-hero);
+  border-radius: var(--radius-lg);
+  color: #fff;
+  box-shadow: 0 12px 32px rgba(37, 99, 235, 0.28), 0 4px 10px rgba(37, 99, 235, 0.16);
+  position: relative;
+  overflow: hidden;
+}
+.hero-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 80% 10%, rgba(255,255,255,0.18) 0%, transparent 35%),
+    radial-gradient(circle at 10% 90%, rgba(255,255,255,0.10) 0%, transparent 30%);
+  pointer-events: none;
+}
+
+/* 次按钮（白底） */
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.95);
+  color: #2563eb;
+  border: none;
+  border-radius: var(--radius);
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+.btn-secondary:hover:not(:disabled) {
+  opacity: 0.95;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+.btn-secondary:active:not(:disabled) { transform: translateY(0); }
 
 /* 主按钮 */
 .btn-primary {
