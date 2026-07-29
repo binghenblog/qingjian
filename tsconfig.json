@@ -19,6 +19,6 @@
     "paths": { "@/*": ["src/*"] },
     "types": ["vite/client", "unocss"]
   },
-  "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.vue", "uno.config.ts"],
+  "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.vue"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

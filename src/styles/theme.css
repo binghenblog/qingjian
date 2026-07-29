@@ -1,28 +1,131 @@
 :root {
-  --c-brand: #2f9e8f;
-  --c-brand-soft: #2f9e8f22;
-  --c-bg: #ffffff;
-  --c-bg-soft: #f6f7f9;
-  --c-fg: #1f2329;
-  --c-fg-soft: #6b7280;
-  --c-border: #e5e7eb;
+  /* 品牌色 */
+  --c-brand: #14b8a6;
+  --c-brand-strong: #0d9488;
+  --c-brand-soft: #14b8a61a;
+  --c-brand-grad: linear-gradient(135deg, #14b8a6 0%, #0ea5e9 100%);
+
+  /* 表面层次：页面底 → 卡片面 → 悬浮面 */
+  --c-bg: #f5f6f8;
+  --c-surface: #ffffff;
+  --c-surface-hover: #f0f2f5;
+  --c-fg: #18212f;
+  --c-fg-soft: #64748b;
+  --c-fg-faint: #94a3b8;
+  --c-border: #e6e8ee;
+
+  /* 阴影 */
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06);
+  --shadow-md: 0 4px 12px rgba(16, 24, 40, 0.08), 0 2px 4px rgba(16, 24, 40, 0.04);
+  --shadow-lg: 0 12px 32px rgba(16, 24, 40, 0.14), 0 4px 8px rgba(16, 24, 40, 0.06);
+
+  --radius: 12px;
+  --radius-lg: 16px;
 }
 
 .dark {
-  --c-brand: #3ec2ad;
-  --c-brand-soft: #3ec2ad22;
-  --c-bg: #16181d;
-  --c-bg-soft: #1e2128;
-  --c-fg: #e6e8eb;
-  --c-fg-soft: #9aa0a8;
-  --c-border: #2a2e36;
+  --c-brand: #2dd4bf;
+  --c-brand-strong: #14b8a6;
+  --c-brand-soft: #2dd4bf1f;
+  --c-brand-grad: linear-gradient(135deg, #2dd4bf 0%, #38bdf8 100%);
+
+  --c-bg: #0e1117;
+  --c-surface: #161a22;
+  --c-surface-hover: #1d222c;
+  --c-fg: #e7eaf0;
+  --c-fg-soft: #9aa4b2;
+  --c-fg-faint: #64748b;
+  --c-border: #262c37;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.55);
 }
 
 * { box-sizing: border-box; }
 html, body, #app { height: 100%; margin: 0; }
+
 body {
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
   background: var(--c-bg);
   color: var(--c-fg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
+
 a { color: inherit; text-decoration: none; }
+
+/* 颜色/边框/阴影的全局平滑过渡（主题切换时不生硬） */
+body, .card, aside, header, input, button {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* 通用卡片 */
+.card {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+/* 现代滚动条 */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--c-border);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--c-fg-faint); }
+
+/* 输入框聚焦环 */
+.input-modern {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.input-modern:focus {
+  border-color: var(--c-brand);
+  box-shadow: 0 0 0 3px var(--c-brand-soft);
+}
+
+/* 主按钮 */
+.btn-primary {
+  background: var(--c-brand-grad);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 2px 8px var(--c-brand-soft);
+}
+.btn-primary:hover:not(:disabled) {
+  opacity: 0.92;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(20, 184, 166, 0.35);
+}
+.btn-primary:active:not(:disabled) { transform: translateY(0); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* 页面切换过渡 */
+.page-enter-active, .page-leave-active { transition: opacity 0.18s ease, transform 0.18s ease; }
+.page-enter-from { opacity: 0; transform: translateY(6px); }
+.page-leave-to { opacity: 0; transform: translateY(-4px); }
+
+/* 弹层过渡 */
+.pop-enter-active, .pop-leave-active { transition: opacity 0.16s ease, transform 0.16s ease; }
+.pop-enter-from, .pop-leave-to { opacity: 0; transform: scale(0.97) translateY(-8px); }
+
+/* kbd 快捷键徽标 */
+kbd {
+  font-family: inherit;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--c-border);
+  background: var(--c-bg);
+  color: var(--c-fg-faint);
+  box-shadow: inset 0 -1px 0 var(--c-border);
+}
