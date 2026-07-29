@@ -2,11 +2,15 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTodoStore, dateKey } from '@/stores/todos'
+import { useSettingsStore } from '@/stores/settings'
 import TodoBadges from '@/components/TodoBadges.vue'
 import { DAILY_CATEGORY } from '@/types'
 
 const router = useRouter()
 const store = useTodoStore()
+const settings = useSettingsStore()
+/** 显示名：设置里可自定义，默认「朋友」 */
+const displayName = computed(() => settings.userName.trim() || '朋友')
 
 const today = computed(() =>
   new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' })
@@ -71,7 +75,7 @@ function addProgress() {
       <div>
         <div class="text-xs font-medium text-fg-faint tracking-wide mb-1">{{ today }}</div>
         <h1 class="text-2xl font-bold m-0 tracking-tight">
-          {{ greeting }}，<span class="grad-text">冰痕</span>
+          {{ greeting }}，<span class="grad-text">{{ displayName }}</span>
         </h1>
       </div>
       <div class="flex items-center gap-2.5">

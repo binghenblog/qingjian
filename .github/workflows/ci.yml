@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+# 最小权限：CI 只需读取代码
+permissions:
+  contents: read
+
 jobs:
   frontend:
     runs-on: ubuntu-latest

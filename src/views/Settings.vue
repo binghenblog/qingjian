@@ -91,6 +91,18 @@ const channels: { value: AIProviderType; label: string; icon: string }[] = [
   <div class="space-y-5 max-w-2xl">
     <h2 class="text-xl font-bold m-0">设置</h2>
 
+    <!-- 个人资料 -->
+    <section class="setting-card rounded-2xl p-5">
+      <div class="font-semibold text-sm mb-1">个人资料</div>
+      <p class="text-xs text-fg-faint mt-0 mb-3">仪表盘问候语中显示的名字，仅存本机</p>
+      <input
+        v-model="settings.userName"
+        placeholder="输入你的名字，如：冰痕"
+        class="input-modern w-full max-w-xs px-3 py-2 text-sm"
+        maxlength="12"
+      />
+    </section>
+
     <!-- 外观 -->
     <section class="setting-card rounded-2xl p-5">
       <div class="font-semibold text-sm mb-1">外观</div>
