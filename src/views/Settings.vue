@@ -168,7 +168,7 @@ const channels: { value: AIProviderType; label: string; icon: string }[] = [
           placeholder="sk-..."
         />
         <p class="field-hint">
-          ⚠️ 仅保存在本机浏览器（localStorage）。纯 Web 端直连云端可能受 CORS 限制；Tauri 打包后建议经本地后端中转（M5）。
+          ⚠️ 仅保存在本机浏览器（localStorage）。纯 Web 端直连云端可能受 CORS 限制；桌面版将经本地后端中转，更安全。
         </p>
       </label>
     </section>

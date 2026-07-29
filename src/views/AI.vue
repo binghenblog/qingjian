@@ -61,7 +61,7 @@ async function send() {
     if (!assistant.content) assistant.content = '（模型未返回内容）'
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : '请求失败'
-    assistant.content = `⚠️ ${msg}\n\n如为云端通道，纯 Web 端可能受 CORS 限制；用 Tauri 打包后经由本地后端中转可解决（M5）。`
+    assistant.content = `⚠️ ${msg}\n\n如为云端通道，纯 Web 端可能受 CORS 限制；桌面版会经本地后端中转解决此问题。`
   } finally {
     loading.value = false
     await scrollBottom()

@@ -227,11 +227,6 @@ function addProgress() {
       </button>
     </div>
 
-    <!-- 状态说明 -->
-    <div class="milestone flex items-center gap-3 px-4 py-3 rounded-2xl text-sm">
-      <span class="i-carbon-rocket text-brand text-lg shrink-0" />
-      <span class="text-fg-soft">M0 脚手架已就绪 · 数据持久化（M1）与 AI 接入（M3）将在后续里程碑上线</span>
-    </div>
   </div>
 </template>
 
@@ -336,15 +331,6 @@ function addProgress() {
 .card-teal { background: linear-gradient(135deg, #14b8a6, #0d9488); }
 .card-blue { background: linear-gradient(135deg, #38bdf8, #2563eb); }
 .card-violet { background: linear-gradient(135deg, #a78bfa, #7c3aed); }
-
-.milestone {
-  background: var(--c-hero-soft);
-  border: 1px dashed #bfdbfe;
-}
-.dark .milestone {
-  background: rgba(30, 64, 175, 0.12);
-  border-color: rgba(59, 130, 246, 0.35);
-}
 
 .list-enter-active, .list-leave-active { transition: all 0.2s ease; }
 .list-enter-from { opacity: 0; transform: translateY(-6px); }

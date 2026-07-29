@@ -69,7 +69,7 @@ function openPalette() {
 
         <div class="px-3 py-1.5 text-[11px] text-fg-faint flex items-center gap-1.5">
           <span class="w-1.5 h-1.5 rounded-full bg-brand inline-block" />
-          v0.1.0 · M0
+          v0.1.0
         </div>
       </div>
     </aside>
