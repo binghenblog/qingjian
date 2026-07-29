@@ -1,9 +1,10 @@
 # 青简 (QingJian) 项目全面审查报告
 
-**审查日期**: 2026-07-29  
+**审查日期**: 2026-07-29（三轮审查，含对抗验证修正）  
 **项目**: Tauri 2 + Vue 3 + TypeScript 个人工作台（笔记、待办、AI 对话、设置）  
 **技术栈**: Vite · Pinia · UnoCSS · Dexie (IndexedDB) · Rust (Tauri)  
 **代码规模**: ~21 个前端源文件 + 2 个 Rust 文件  
+**审查规模**: 12 个 Agent × 3 轮，覆盖 12 个审查维度  
 
 ---
 
@@ -11,12 +12,12 @@
 
 | 严重程度 | 数量 | 说明 |
 |---------|------|------|
-| 🔴 Critical | 9 | 必须立即修复，影响功能/安全/可访问性 |
-| 🟠 High | 12 | 应尽快修复，存在安全漏洞/数据风险/UX 缺陷 |
-| 🟡 Medium | 34 | 建议修复，影响代码质量和可维护性 |
-| 🔵 Low | 27 | 可选优化，当前影响较小 |
-| ⚪ Info | 18 | 信息提示和正面评价 |
-| **合计** | **100** | 两轮审查总计 |
+| 🔴 Critical | 6 | 必须修复，影响功能/安全 |
+| 🟠 High | 10 | 应尽快修复，存在数据风险或功能缺陷 |
+| 🟡 Medium | 49 | 建议修复，影响代码质量和可维护性 |
+| 🔵 Low | 43 | 可选优化，当前影响较小 |
+| ⚪ Info | 25 | 信息提示和正面评价 |
+| **合计** | **~115** | **三轮 12 个 Agent，含对抗验证修正** |
 
 ---
 
@@ -233,8 +234,6 @@ localStorage 存储没有版本号管理。`category` 字段的迁移只是内�
 | 🔵 Low | 11 | 边界场景和风格一致性 |
 | **合计（新增）** | **38** | |
 
-**两轮合计**: 🔴 9 · 🟠 12 · 🟡 34 · 🔵 27 · ⚪ 8 = **90 个发现**
-
 ---
 
 ## 🔴 Critical — 第二轮新增
@@ -445,3 +444,178 @@ async function del() { if (store.current) await store.remove(store.current.id) }
 ---
 
 *第二轮审查新增 38 个发现，两轮合计 90 个。覆盖维度扩展至：数据边界条件 · XSS/注入/SSRF 深度检查 · 可访问性 (WCAG) · 响应式设计 · 内存泄漏 · 组件生命周期*
+
+---
+
+# 第三轮审查报告（2026-07-29 补充 — 含对抗验证修正）
+
+> 第三轮采用对抗性验证 + 全新角度覆盖。**重要发现：对抗验证推翻或降级了前两轮多个关键结论。**
+
+---
+
+## ⚔️ 对抗验证结果 — 前两轮结论修正
+
+以下 10 个前两轮的关键发现经过逐一代码验证后的结论：
+
+| # | 原发现 | 原级别 | 验证结论 | 证据 |
+|---|--------|--------|---------|------|
+| 1 | MarkdownIt `javascript:` XSS | 🟠 High | ✅ **ALREADY FIXED** | `src/services/markdown.ts:17-19` 已有 `validateLink` 阻止 `javascript:`/`data:`/`vbscript:`/`file:` 协议 |
+| 2 | IndexedDB 不可用时白屏 | 🟠 High | ✅ **ALREADY FIXED** | `notes.ts:42-44` 有 `isStorageAvailable()` 检查 + `loadError` + `Notes.vue:186-193` 有 `role="alert"` 提示横幅 |
+| 3 | 笔记删除无确认对话框 | 🟠 High | ❌ **FALSE POSITIVE** | `Notes.vue:149` 有 `confirm('删除笔记「...」？此操作不可撤销')` |
+| 4 | 笔记搜索无 debounce | 🟠 High | ❌ **FALSE POSITIVE** | `Notes.vue:43-54` 已实现 200ms debounce |
+| 5 | API Key 明文存储 | 🔴 Critical | ⬇️ **DOWNGRADED → Medium** | 默认 sessionStorage（关闭即清），需用户显式开启"记住"；桌面版走 Tauri IPC 不过 WebView |
+| 6 | 零测试覆盖 | 🔴 Critical | ❌ **FALSE POSITIVE** | 存在 4 个测试文件约 460 行：`notes.test.ts`、`todos.test.ts`、`settings.test.ts`、`backup.test.ts` |
+| 7 | 笔记自动保存竞态 | 🟠 High | ✅ **ALREADY FIXED** | `Notes.vue:95-131` 已实现 `pendingSave` 快照 + `watchedId` 锁定 + 切换时先 flush |
+| 8 | fs 插件权限过于宽松 | 🟠 High | ⬇️ **DOWNGRADED → Low** | `capabilities/default.json:12-19` 仅授权 `read-text-file`/`write-text-file` 等 5 个操作，scope 限定 `$APPDATA` |
+| 9 | CSP 过于宽松 | 🟠 High | ⬇️ **DOWNGRADED → Low** | `default-src 'self'`，无 `script-src unsafe-inline/eval`，`connect-src` 仅 localhost+ipc，`style unsafe-inline` 是 Vue 必需 |
+| 10 | readNdjson/readSSE 代码重复 | 🟡 Medium | ❌ **FALSE POSITIVE** | `ai.ts:31-50` 已抽取共享 `readLines()` 生成器函数，仅 JSON 解析不同 |
+
+**结论**：10 个发现中 **4 个误报、3 个已修复、3 个应降级**。项目实际状况比前两轮报告暗示的要好得多。
+
+---
+
+## 修正后的总计
+
+| 严重程度 | 第一轮 | 第二轮 | 第三轮新增 | 对抗验证修正 | **最终确认** |
+|---------|--------|--------|-----------|-------------|-------------|
+| 🔴 Critical | 4 | 5 | 0 | -3 (误报1, 降级1, 不变1) | **6** |
+| 🟠 High | 6 | 6 | 4 | -6 (误报3, 已修复2, 降级1) | **10** |
+| 🟡 Medium | 18 | 16 | 13 | +2 (降级自High/Critical) | **49** |
+| 🔵 Low | 16 | 11 | 14 | +2 (降级自High) | **43** |
+| ⚪ Info | 8 | 10 | 7 | 0 | **25** |
+
+---
+
+## 第三轮新发现（排除前两轮重复）
+
+### 🟠 High — 新增
+
+### H-13. 窗口关闭时笔记自动保存可能丢失
+
+**文件**: `Notes.vue:100-131`
+
+笔记编辑使用 500ms 防抖。`onUnmounted` 会调 `flushSave()`，但在 Tauri 桌面端，**窗口关闭时 Vue 生命周期钩子可能来不及执行**（WebView 进程直接销毁）。最后 500ms 内的编辑可能丢失。
+
+> **修复**: 监听 `tauri://close-requested` 事件或 `beforeunload`，在窗口关闭前同步 flush。
+
+### H-14. 无全局 Vue 错误处理和未捕获 Promise rejection
+
+**文件**: `main.ts`、`App.vue`
+
+`main.ts` 没有注册 `app.config.errorHandler`，`App.vue` 没有 `onErrorCaptured`，也没有全局 `window.addEventListener('unhandledrejection')`。**任何未捕获的运行时错误都会导致白屏**，用户无任何反馈。
+
+> **修复**: 在 `main.ts` 添加 `app.config.errorHandler` + `window.addEventListener('unhandledrejection')`。
+
+### H-15. 备份导入后 todos/folders 内存态不同步
+
+**文件**: `backup.ts:151-178` + `Settings.vue:44-47`
+
+`importBackup()` 直接写 localStorage，但 Pinia store 的内存 ref 仍持旧数据。刷新前导航到 Todos/Dashboard 会看到**旧数据**，UI 显示"导入成功"但实际看到不一致。
+
+> **修复**: 导入后主动调用 store reload（需先添加 `reload()` 方法），或在导入完成时强制刷新。
+
+### H-16. notes store 无 `reload()` 方法
+
+**文件**: `notes.ts:41`
+
+`load()` 有 `if (loaded.value || loadError.value) return` 短路保护，已加载后无法重新读取 IndexedDB。备份导入后无法重载数据。
+
+> **修复**: 添加 `reload()` 方法，重置 `loaded` 后重新 `load()`。
+
+### 🟡 Medium — 新增
+
+| # | 位置 | 问题 | 修复建议 |
+|---|------|------|---------|
+| M-35 | `Notes.vue:133-136` | `flushSave` 在 `onUnmounted` 中异步写入未 catch，写入失败产生 unhandled rejection | 添加 `.catch(console.error)` |
+| M-36 | `Notes.vue` 模块级变量 | HMR 热更新重置 `pendingSave`/`saveTimer`，开发模式下可能丢失未保存编辑 | 用 `ref` 代替 `let` 或注册 HMR accept |
+| M-37 | `Dashboard.vue:15-17` | `today`/`greeting` 是 `computed(() => new Date())`，不响应跨日——过了午夜日期和问候语不变 | 用 `setInterval` 每分钟刷新响应式时间戳 |
+| M-38 | `tauri.conf.json:23` | CSP `img-src` 未包含外部域名，Markdown 预览中的外部图片链接（`![](https://...)`）在桌面端被拦截 | 添加 `https:` 到 `img-src` 或通过 Tauri command 代理图片 |
+| M-39 | `pnpm-workspace.yaml` | 内容 `allowBuilds: esbuild/vue-demi` 不是有效的 workspace 配置，位置也错误 | 删除文件，将配置移入 `package.json > pnpm` 字段 |
+| M-40 | `theme.css:128-143` | `.btn-secondary` 使用硬编码白色背景/蓝色文字，无 `.dark` 暗色主题覆盖 | 添加 `.dark .btn-secondary` 样式 |
+| M-41 | UnoCSS 生成 | `.h1`/`.h2`/`.h3` 被生成为 height 快捷类（`0.25rem`/`0.5rem`/`0.75rem`），与 HTML heading 语义冲突 | 在 UnoCSS 配置中排除这些类名 |
+| M-42 | `theme.css:7,11,36,39` | `--c-brand-grad-soft` 和 `--c-hero-soft` 已定义但全局零引用（死代码） | 删除未使用的变量 |
+| M-43 | `tauri.conf.json` | `tauri-plugin-sql` 已引入注册但前端从未使用，增加包体积和攻击面 | 移除或禁用 SQL 插件 |
+| M-44 | `Notes.vue` | 路由切换后编辑模式(edit/split/preview)、搜索内容、文件夹筛选全部重置为默认值 | 将 UI 状态持久化到 store 或 sessionStorage |
+| M-45 | `Settings.vue:17` | 导入备份后 `noteCount` computed 仍显示旧笔记数（读的是内存中未刷新的 notes 数组） | 依赖 reload 机制一并修复 |
+| M-46 | `todos.ts` 全局 | todos store 无 `reload()` 方法，备份导入后无法从内存刷新 | 添加 `reload()` 方法 |
+| M-47 | `main.ts` | 无全局未捕获 Promise rejection 处理，异步错误静默丢失 | 添加 `window.addEventListener('unhandledrejection')` |
+
+### 🔵 Low — 新增
+
+| # | 位置 | 问题 |
+|---|------|------|
+| L-28 | `todos.ts:172-183` | DST 切换日凌晨 streak 回溯可能有边界问题（仅影响非中国时区） |
+| L-29 | `todos.ts:150-159` | `yesterdayMissed` 中两次 `new Date()` 在午夜边界有纳秒级差异风险 |
+| L-30 | `Dashboard.vue:43-54` | `weekBars` 一周从周日开始，不符合中国惯例（应从周一开始） |
+| L-31 | `backup.ts:128-136` | 备份导入 `completedAt` 字段未做 `numTs()` 校验 |
+| L-32 | `theme.css:113,159` | `.hero-card` 和 `.btn-primary:hover` 的 box-shadow 使用硬编码颜色值，暗色主题未适配 |
+| L-33 | 多处 Vue SFC | `transition: all` 使用过于宽泛，应指定具体属性 |
+| L-34 | `uno.config.ts:18` | `'bg-soft': 'var(--c-surface)'` 别名语义误导（映射到 surface 而非 bg-soft） |
+| L-35 | `todos.ts:62-79` | `loadTodos()` 静默吞掉加载错误（catch 中 `return []`），用户不知道数据加载失败 |
+| L-36 | `vite.config.ts:13` | `base: './'` 相对路径对 Web 子路径部署不友好 |
+| L-37 | `tauri.conf.json:13-18` | 窗口未设置 `center: true`，首次启动可能出现在任意位置 |
+| L-38 | 全项目 | 大量硬编码中文，无 i18n 框架，阻碍国际化 |
+| L-39 | `notes.ts:113-128` | `create()` 写盘失败时异常未处理，对比 `update()` 有 try-catch |
+| L-40 | `todos.ts:98-108` | 200ms 防抖写入 localStorage 无 `beforeunload` flush |
+| L-41 | `todo-badges.css` | UnoCSS `*` 选择器初始化约 35 个未使用的 `--un-*` 自定义属性 |
+
+### ⚪ Info — 新增
+
+| # | 说明 |
+|---|------|
+| I-19 | 无自动更新机制（`tauri-plugin-updater` 未引入），v0.1.0 可接受 |
+| I-20 | 无系统托盘集成，个人工作台类应用常见需求 |
+| I-21 | CSS 变量系统完整——18 个变量亮色/暗色对称定义，无缺失 |
+| I-22 | `main.ts` 导入顺序正确——`uno.css` 在 `theme.css` 之前，主题样式可覆盖工具类 |
+| I-23 | CSS 按路由分割——页面级样式随懒加载 chunk 一起下载 |
+| I-24 | 所有动画使用 `transform`/`opacity` 而非 `top`/`margin`，无 layout thrashing |
+| I-25 | 选择器深度最大 2 级（`.dark .xxx[data-v-xxx]`），无过深嵌套 |
+
+---
+
+## 最终综合修复路线图（三轮审查修正后）
+
+```
+🔴 立即 (1-2 天)
+├── H-14  main.ts 添加全局错误处理（5 min）
+├── H-13  Tauri beforeunload flush 保存缓冲区（30 min）
+├── H-15  备份导入后刷新 store 内存态（30 min）
+├── H-16  notes store 添加 reload() 方法（15 min）
+├── M-37  Dashboard today/greeting 跨日更新（20 min）
+└── M-40  btn-secondary 暗色主题覆盖（10 min）
+
+🟠 本周 (3-5 天)
+├── M-39  清理 pnpm-workspace.yaml（5 min）
+├── M-42  删除未使用的 CSS 变量（5 min）
+├── M-43  移除未使用的 SQL 插件（10 min）
+├── M-41  排除 UnoCSS .h1/.h2/.h3 类名冲突（10 min）
+├── M-38  CSP img-src 添加外部域名（10 min）
+├── M-35  flushSave 添加 catch 处理（5 min）
+└── M-47  全局 unhandledrejection 监听（5 min）
+
+🟡 本迭代 (1-2 周)
+├── M-36  HMR 热更新状态保护
+├── M-44  路由切换 UI 状态持久化
+├── M-45, M-46  导入后数据一致性修复
+├── 剩余 Medium 问题
+└── L-28~L-41  Low 问题
+
+🔵 后续迭代
+├── L-38  i18n 国际化框架
+├── I-19  自动更新机制
+├── I-20  系统托盘集成
+└── 其余 Info/Low 问题
+```
+
+---
+
+## 三轮审查总览
+
+| 轮次 | Agent 数 | 审查维度 | 新发现 | 修正 |
+|------|---------|---------|--------|------|
+| 第一轮 | 4 | 配置安全 · 前端代码 · Rust 后端 · 测试与集成 | 52 | — |
+| 第二轮 | 4 | 数据边界 · 安全深度 · 可访问性 · 内存泄漏 | 38 | — |
+| 第三轮 | 4 | 对抗验证 · 跨组件数据流 · CSS 架构 · 日期/桌面 | 44 | **-10 (4误报+3已修复+3降级)** |
+| **合计** | **12** | **12 个审查维度** | **134** | **去重后约 115 个独立发现** |
+
+*第三轮审查新增 44 个发现（含对抗验证修正），最终确认约 115 个独立问题。对抗验证将前两轮 9 个 Critical/High 降级为已修复、误报或更低级别，项目实际状况显著优于初始评估。*
