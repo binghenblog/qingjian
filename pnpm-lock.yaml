@@ -33,6 +33,9 @@ importers:
         specifier: ^4.5.0
         version: 4.6.4(vue@3.5.40(typescript@5.6.2))
     devDependencies:
+      '@iconify-json/carbon':
+        specifier: ^1.2.24
+        version: 1.2.24
       '@tauri-apps/cli':
         specifier: ^2.2.0
         version: 2.11.4
@@ -515,6 +518,9 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
+
+  '@iconify-json/carbon@1.2.24':
+    resolution: {integrity: sha512-b7u/eTWE3xFa7UXlRJBSEm6At1y6+F0P3imBEip5/8QeRzouxVjBf80Y2xnu1GYsFo9MYlHA0bZfxxMd5givfw==}
 
   '@iconify/types@2.0.0':
     resolution: {integrity: sha512-+wluvCrRhXrhyOmRDJ3q8mux9JkKy5SJ/v8ol2tu4FVjyYvtEzkc/3pK15ET6RKg4b4w4BmTk1+gsCUhf21Ykg==}
@@ -1687,6 +1693,10 @@ snapshots:
 
   '@esbuild/win32-x64@0.28.1':
     optional: true
+
+  '@iconify-json/carbon@1.2.24':
+    dependencies:
+      '@iconify/types': 2.0.0
 
   '@iconify/types@2.0.0': {}
 
