@@ -5,6 +5,8 @@ export interface NoteRecord {
   title: string
   content: string
   tags: string[]
+  /** 所属文件夹名；空字符串 = 未分类 */
+  folder: string
   createdAt: number
   updatedAt: number
 }
@@ -29,6 +31,19 @@ class QingjianDB extends Dexie {
       // 主键 id；updatedAt / createdAt 用于排序与查询
       notes: 'id, updatedAt, createdAt'
     })
+    // v2：新增 folder 索引；旧数据 folder 补空串（未分类）
+    this.version(2)
+      .stores({
+        notes: 'id, updatedAt, createdAt, folder'
+      })
+      .upgrade((tx) =>
+        tx
+          .table('notes')
+          .toCollection()
+          .modify((n) => {
+            if (typeof n.folder !== 'string') n.folder = ''
+          })
+      )
   }
 }
 
@@ -37,7 +52,9 @@ const db = new QingjianDB()
 /** Web 端 Dexie 实现 */
 class DexieStorage implements StorageAdapter {
   async listNotes(): Promise<NoteRecord[]> {
-    return db.notes.orderBy('updatedAt').reverse().toArray()
+    const list = await db.notes.orderBy('updatedAt').reverse().toArray()
+    // 容错：极端情况下（升级钩子未跑）确保 folder 存在
+    return list.map((n) => ({ ...n, folder: typeof n.folder === 'string' ? n.folder : '' }))
   }
   async getNote(id: string): Promise<NoteRecord | undefined> {
     return db.notes.get(id)

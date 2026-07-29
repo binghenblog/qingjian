@@ -1,16 +1,18 @@
 <script setup lang="ts">
-import { ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useNoteStore } from '@/stores/notes'
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ 'update:open': [boolean] }>()
 
 const router = useRouter()
+const noteStore = useNoteStore()
 const q = ref('')
 const inputEl = ref<HTMLInputElement>()
 const activeIdx = ref(0)
 
-const items = [
+const pages = [
   { title: '仪表盘', to: '/', icon: 'i-carbon-dashboard' },
   { title: '笔记', to: '/notes', icon: 'i-carbon-document' },
   { title: '待办', to: '/todos', icon: 'i-carbon-task' },
@@ -18,28 +20,55 @@ const items = [
   { title: '设置', to: '/settings', icon: 'i-carbon-settings' }
 ]
 
-const filtered = ref(items)
+interface PaletteItem {
+  kind: 'page' | 'note'
+  title: string
+  icon: string
+  /** page: 路由；note: 笔记 id */
+  target: string
+  hint?: string
+}
 
-watch(q, (v) => {
-  filtered.value = items.filter((i) => i.title.includes(v))
-  activeIdx.value = 0
+/** 页面项 + 笔记全文搜索结果（最多 8 条） */
+const items = computed<PaletteItem[]>(() => {
+  const query = q.value.trim()
+  const pageItems: PaletteItem[] = pages
+    .filter((p) => !query || p.title.includes(query))
+    .map((p) => ({ kind: 'page', title: p.title, icon: p.icon, target: p.to }))
+  if (!query) return pageItems
+  const noteItems: PaletteItem[] = noteStore.searchNotes(query, 8).map((r) => ({
+    kind: 'note',
+    title: r.note.title || '无标题笔记',
+    icon: 'i-carbon-document',
+    target: r.note.id,
+    hint: r.field === 'title' ? (r.note.folder || '笔记') : r.snippet
+  }))
+  return [...pageItems, ...noteItems]
 })
+
+watch(q, () => (activeIdx.value = 0))
 
 watch(
   () => props.open,
   async (v) => {
     if (v) {
       q.value = ''
-      filtered.value = items
       activeIdx.value = 0
+      // 确保笔记已加载（首次直接打开面板搜索的场景）
+      if (!noteStore.loaded) noteStore.load()
       await nextTick()
       inputEl.value?.focus()
     }
   }
 )
 
-function go(to: string) {
-  router.push(to)
+function go(item: PaletteItem) {
+  if (item.kind === 'page') {
+    router.push(item.target)
+  } else {
+    noteStore.select(item.target)
+    router.push('/notes')
+  }
   emit('update:open', false)
 }
 
@@ -53,14 +82,14 @@ function onKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape') emit('update:open', false)
   if (e.key === 'ArrowDown') {
     e.preventDefault()
-    activeIdx.value = (activeIdx.value + 1) % filtered.value.length
+    activeIdx.value = (activeIdx.value + 1) % items.value.length
   }
   if (e.key === 'ArrowUp') {
     e.preventDefault()
-    activeIdx.value = (activeIdx.value - 1 + filtered.value.length) % filtered.value.length
+    activeIdx.value = (activeIdx.value - 1 + items.value.length) % items.value.length
   }
-  if (e.key === 'Enter' && filtered.value[activeIdx.value]) {
-    go(filtered.value[activeIdx.value].to)
+  if (e.key === 'Enter' && items.value[activeIdx.value]) {
+    go(items.value[activeIdx.value])
   }
 }
 
@@ -82,25 +111,27 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
             <input
               ref="inputEl"
               v-model="q"
-              placeholder="搜索页面、命令…"
+              placeholder="搜索页面、笔记全文…"
               class="flex-1 py-3.5 outline-none bg-transparent text-fg placeholder:text-fg-faint"
             />
             <kbd>ESC</kbd>
           </div>
           <ul class="max-h-80 overflow-auto p-1.5 m-0 list-none">
             <li
-              v-for="(i, idx) in filtered"
-              :key="i.to"
-              @click="go(i.to)"
+              v-for="(i, idx) in items"
+              :key="i.kind + i.target"
+              @click="go(i)"
               @mousemove="activeIdx = idx"
               class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl cursor-pointer text-sm"
               :class="idx === activeIdx ? 'item-active' : 'text-fg-soft'"
             >
-              <span :class="i.icon" class="text-base" />
-              <span>{{ i.title }}</span>
-              <span v-if="idx === activeIdx" class="ml-auto text-xs text-fg-faint">↵</span>
+              <span :class="i.icon" class="text-base shrink-0" />
+              <span class="shrink-0">{{ i.title }}</span>
+              <span v-if="i.hint" class="hint text-xs text-fg-faint truncate flex-1">{{ i.hint }}</span>
+              <span v-if="i.kind === 'note'" class="kind-badge shrink-0">笔记</span>
+              <span v-if="idx === activeIdx" class="ml-auto text-xs text-fg-faint shrink-0">↵</span>
             </li>
-            <li v-if="filtered.length === 0" class="px-3 py-6 text-center text-sm text-fg-faint">
+            <li v-if="items.length === 0" class="px-3 py-6 text-center text-sm text-fg-faint">
               没有匹配的结果
             </li>
           </ul>
@@ -127,4 +158,13 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 .dark .item-active {
   color: var(--c-brand);
 }
+.kind-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--c-bg);
+  border: 1px solid var(--c-border);
+  color: var(--c-fg-faint);
+}
+.hint { min-width: 0; }
 </style>
