@@ -1,0 +1,35 @@
+node_modules
+dist
+dist-ssr
+*.local
+
+# 环境变量（真实密钥绝不入库；仅 .env.example 入库）
+.env
+.env.*
+!.env.example
+
+# Tauri 生成物（构建时产生，不入库）
+/src-tauri/target
+/src-tauri/gen
+/src-tauri/gen.schema.json
+
+# 用户数据（本地优先，绝不入库）
+*.db
+*.sqlite
+*.sqlite3
+qingjian-data/
+
+# 签名 / 密钥
+*.keystore
+*.p12
+*.pfx
+*.pem
+
+# 编辑器
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+
+# WorkBuddy 项目记忆（工具数据，不入库）
+.workbuddy/
