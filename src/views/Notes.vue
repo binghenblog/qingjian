@@ -72,21 +72,21 @@ onMounted(() => {
     <!-- 左：笔记列表 -->
     <aside class="list-panel flex flex-col rounded-2xl overflow-hidden">
       <div class="p-3 border-b border-border space-y-2.5">
-        <div class="flex items-center gap-2">
-          <div class="search-box flex items-center gap-2 px-3 flex-1">
-            <span class="i-carbon-search text-fg-faint text-sm" />
+        <div class="flex items-center gap-2.5">
+          <div class="search-box h-9 flex items-center gap-2 px-3 flex-1 min-w-0">
+            <span class="i-carbon-search text-fg-faint text-sm shrink-0" />
             <input
               v-model="search"
               placeholder="搜索笔记…"
-              class="flex-1 py-1.5 bg-transparent outline-none text-sm placeholder:text-fg-faint"
+              class="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-fg-faint"
             />
           </div>
           <button
             @click="newNote"
-            class="btn-primary w-9 h-9 rounded-xl grid place-items-center shrink-0"
+            class="new-btn w-9 h-9 flex items-center justify-center shrink-0 cursor-pointer"
             title="新建笔记"
           >
-            <span class="i-carbon-add text-lg" />
+            <span class="i-carbon-add text-lg leading-none" />
           </button>
         </div>
       </div>
@@ -221,7 +221,20 @@ onMounted(() => {
   background: var(--c-bg);
   border: 1px solid var(--c-border);
   border-radius: var(--radius);
+  transition: border-color 0.15s ease;
 }
+.search-box:focus-within { border-color: var(--c-brand); }
+
+/* 新建按钮：与搜索框同高同圆角，无位移动效避免与边线挤压 */
+.new-btn {
+  background: var(--c-brand-grad);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  transition: opacity 0.15s ease, box-shadow 0.15s ease;
+}
+.new-btn:hover { opacity: 0.9; box-shadow: 0 3px 10px var(--c-brand-soft); }
+.new-btn:active { opacity: 0.8; }
 
 .note-item { transition: background-color 0.15s ease, border-color 0.15s ease; border: 1px solid transparent; }
 .note-item:hover { background: var(--c-surface-hover); }
