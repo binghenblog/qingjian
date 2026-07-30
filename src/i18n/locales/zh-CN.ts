@@ -11,7 +11,8 @@ export default {
   },
   common: {
     confirm: '确定',
-    cancel: '取消'
+    cancel: '取消',
+    undo: '撤销'
   },
   nav: {
     dashboard: '今日桌面',
@@ -108,7 +109,8 @@ export default {
     deleteFolderTitle: '删除文件夹',
     deleteFolderMsg: '删除文件夹「{name}」？该文件夹下的笔记会归入「未分类」',
     deleteNoteTitle: '删除笔记',
-    deleteNoteMsg: '删除笔记「{title}」？此操作不可撤销',
+    deleteNoteMsg: '删除笔记「{title}」？',
+    deleted: '笔记「{title}」已删除',
     searchCount: '在全部 {total} 条笔记中搜索，共 {matched} 条匹配',
     blankNote: '空白笔记',
     emptyNoMatch: '没有匹配的笔记',

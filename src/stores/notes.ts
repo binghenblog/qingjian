@@ -179,6 +179,26 @@ export const useNoteStore = defineStore('notes', () => {
     if (currentId.value === id) currentId.value = notes.value[0]?.id ?? null
   }
 
+  /**
+   * 撤销删除：把删除前抓取的笔记快照重新插入列表并落盘。
+   * 落盘失败时回滚内存态并提示，与 create/update 的失败处理一致。
+   */
+  async function restore(note: NoteRecord) {
+    notes.value = [note, ...notes.value]
+    try {
+      await storage.saveNote(toPlain(note))
+      lastError.value = null
+    } catch (e) {
+      // 写盘失败：回滚，避免内存里出现「没存上的幽灵笔记」
+      notes.value = notes.value.filter((n) => n.id !== note.id)
+      const msg = le('errors.saveFailed', { msg: (e as Error).message })
+      lastError.value = msg
+      toastError(msg)
+      throw e
+    }
+    select(note.id)
+  }
+
   function select(id: string) {
     currentId.value = id
   }
@@ -231,6 +251,7 @@ export const useNoteStore = defineStore('notes', () => {
     create,
     update,
     remove,
+    restore,
     select,
     addFolder,
     removeFolder,

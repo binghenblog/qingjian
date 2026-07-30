@@ -9,7 +9,8 @@ export default {
   },
   common: {
     confirm: 'Confirm',
-    cancel: 'Cancel'
+    cancel: 'Cancel',
+    undo: 'Undo'
   },
   nav: {
     dashboard: 'Today',
@@ -106,7 +107,8 @@ export default {
     deleteFolderTitle: 'Delete folder',
     deleteFolderMsg: 'Delete folder "{name}"? Its notes will move to "Uncategorized"',
     deleteNoteTitle: 'Delete note',
-    deleteNoteMsg: 'Delete note "{title}"? This cannot be undone',
+    deleteNoteMsg: 'Delete note "{title}"?',
+    deleted: 'Note "{title}" deleted',
     searchCount: 'Searching {total} notes, {matched} matched',
     blankNote: 'Blank note',
     emptyNoMatch: 'No matching notes',

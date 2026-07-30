@@ -20,6 +20,7 @@ import { useRouter } from 'vue-router'
 import { useNoteStore } from '@/stores/notes'
 import { useAiStore } from '@/stores/ai'
 import { useConfirm } from '@/composables/useConfirm'
+import { useToast } from '@/composables/useToast'
 import { md } from '@/services/markdown'
 import { formatNotes } from '@/services/aiContext'
 
@@ -28,6 +29,7 @@ const ai = useAiStore()
 const router = useRouter()
 const { t } = useI18n()
 const { confirm } = useConfirm()
+const { info: toastInfo } = useToast()
 
 const mode = ref<'edit' | 'preview' | 'split'>('edit')
 const search = ref('')
@@ -187,16 +189,24 @@ async function newNote() {
 }
 
 async function del() {
+  const n = store.current
   if (
-    store.current &&
+    n &&
     (await confirm({
       title: t('notes.deleteNoteTitle'),
-      message: t('notes.deleteNoteMsg', { title: store.current.title || t('notes.untitled') }),
+      message: t('notes.deleteNoteMsg', { title: n.title || t('notes.untitled') }),
       confirmText: t('notes.deleteNote'),
       danger: true
     }))
   ) {
-    await store.remove(store.current.id)
+    const snap = { ...n }
+    await store.remove(n.id)
+    // 删除后给 7 秒撤销窗口（审查 M-20：原删除无撤销）
+    toastInfo(
+      t('notes.deleted', { title: n.title || t('notes.untitled') }),
+      7000,
+      { label: t('common.undo'), onClick: () => void store.restore(snap) }
+    )
   }
 }
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useToast, type ToastType } from '@/composables/useToast'
+import { useToast, type ToastType, type ToastItem } from '@/composables/useToast'
 
 const { toasts, dismiss } = useToast()
 
@@ -15,6 +15,12 @@ function iconFor(type: ToastType): string {
     default:
       return 'i-carbon-information'
   }
+}
+
+/** 执行动作按钮回调（如「撤销」）后关闭；@click.stop 已阻止冒泡到外层 dismiss */
+function runAction(item: ToastItem) {
+  item.action?.onClick()
+  dismiss(item.id)
 }
 </script>
 
@@ -37,6 +43,15 @@ function iconFor(type: ToastType): string {
         >
           <span class="toast-icon mt-px shrink-0 text-base" :class="iconFor(t.type)" />
           <span class="toast-msg break-words">{{ t.message }}</span>
+          <button
+            v-if="t.action"
+            type="button"
+            class="toast-action ml-auto shrink-0"
+            :aria-label="t.action.label"
+            @click.stop="runAction(t)"
+          >
+            {{ t.action.label }}
+          </button>
         </div>
       </TransitionGroup>
     </div>
@@ -52,6 +67,20 @@ function iconFor(type: ToastType): string {
 }
 .toast-icon {
   color: var(--c-fg-soft);
+}
+.toast-action {
+  background: transparent;
+  border: none;
+  color: var(--c-brand-strong);
+  font-weight: 600;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.5rem;
+  white-space: nowrap;
+}
+.toast-action:hover {
+  text-decoration: underline;
 }
 .toast-success {
   border-left: 3px solid #16a34a;
