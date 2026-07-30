@@ -5,7 +5,7 @@ export default {
     name: 'QingJian',
     tagline: 'Personal Workbench',
     footer: 'Local-first · Your data stays with you',
-    version: 'v0.1.0'
+    version: 'v0.2.0'
   },
   common: {
     confirm: 'Confirm',
@@ -51,7 +51,7 @@ export default {
     featureAiDesc: 'Cloud / Local dual channel'
   },
   about: {
-    desc: 'v0.1.0 · Lightweight · Modern · Open-source · Local-first · MIT License'
+    desc: '{version} · Lightweight · Modern · Open-source · Local-first · MIT License'
   },
   settings: {
     title: 'Settings',

@@ -7,7 +7,7 @@ export default {
     name: '青简',
     tagline: '个人工作台',
     footer: '本地优先 · 数据在你手中',
-    version: 'v0.1.0'
+    version: 'v0.2.0'
   },
   common: {
     confirm: '确定',
@@ -53,7 +53,7 @@ export default {
     featureAiDesc: '云端 / 本地双通道'
   },
   about: {
-    desc: 'v0.1.0 · 轻量 · 现代 · 开源 · 本地优先 · MIT License'
+    desc: '{version} · 轻量 · 现代 · 开源 · 本地优先 · MIT License'
   },
   settings: {
     title: '设置',

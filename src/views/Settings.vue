@@ -287,7 +287,7 @@ const locales = SUPPORTED_LOCALES
       <span class="logo w-11 h-11 rounded-xl grid place-items-center text-white text-lg font-bold shrink-0">青</span>
       <div>
         <div class="font-semibold text-sm">{{ t('app.name') }} QingJian</div>
-        <div class="text-xs text-fg-faint mt-0.5">{{ t('about.desc') }}</div>
+        <div class="text-xs text-fg-faint mt-0.5">{{ t('about.desc', { version: t('app.version') }) }}</div>
       </div>
     </section>
   </div>
