@@ -146,28 +146,28 @@ function addProgress() {
 
         <TransitionGroup v-if="topPending.length" name="list" tag="ul" class="space-y-2 p-0 m-0 list-none">
           <li
-            v-for="t in topPending"
-            :key="t.id"
+            v-for="todo in topPending"
+            :key="todo.id"
             class="todo-row group flex items-center gap-3 px-3 py-3 rounded-xl"
           >
             <button
-              @click="store.toggle(t.id)"
+              @click="store.toggle(todo.id)"
               role="checkbox"
-              :aria-checked="store.isDone(t) ? 'true' : 'false'"
-              :aria-label="`完成任务 ${t.title}`"
+              :aria-checked="store.isDone(todo) ? 'true' : 'false'"
+              :aria-label="`完成任务 ${todo.title}`"
               class="check w-5 h-5 rounded-full flex items-center justify-center shrink-0 cursor-pointer"
-              :class="{ 'check-done': store.isDone(t) }"
+              :class="{ 'check-done': store.isDone(todo) }"
             >
-              <span v-if="store.isDone(t)" class="i-carbon-checkmark text-[13px] leading-none text-white" />
+              <span v-if="store.isDone(todo)" class="i-carbon-checkmark text-[13px] leading-none text-white" />
             </button>
-            <span class="flex-1 text-sm truncate">{{ t.title }}</span>
+            <span class="flex-1 text-sm truncate">{{ todo.title }}</span>
             <span
               class="cat-chip text-[11px] px-2 py-0.5 rounded-full shrink-0"
-              :class="t.category === DAILY_CATEGORY ? 'cat-daily' : ''"
+              :class="todo.category === DAILY_CATEGORY ? 'cat-daily' : ''"
             >
-              {{ t.category }}
+              {{ todo.category }}
             </span>
-            <TodoBadges :priority="t.priority" :tag="t.tag" />
+            <TodoBadges :priority="todo.priority" :tag="todo.tag" />
           </li>
         </TransitionGroup>
 

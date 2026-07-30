@@ -120,7 +120,12 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
         class="palette-mask fixed inset-0 z-50 grid place-items-start justify-center pt-28"
         @click.self="emit('update:open', false)"
       >
-        <div class="palette w-[560px] max-w-[92vw] rounded-2xl overflow-hidden">
+        <div
+          class="palette w-[560px] max-w-[92vw] rounded-2xl overflow-hidden"
+          role="dialog"
+          aria-modal="true"
+          :aria-label="t('palette.title')"
+        >
           <div class="flex items-center gap-2.5 px-4 border-b border-border">
             <span class="i-carbon-search text-fg-faint" />
             <input
@@ -128,17 +133,24 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
               v-model="q"
               :placeholder="t('palette.searchPlaceholder')"
               class="flex-1 py-3.5 outline-none bg-transparent text-fg placeholder:text-fg-faint"
+              role="combobox"
+              aria-expanded="true"
+              aria-controls="palette-list"
+              :aria-activedescendant="items.length ? `palette-opt-${activeIdx}` : undefined"
             />
             <kbd>ESC</kbd>
           </div>
-          <ul class="max-h-80 overflow-auto p-1.5 m-0 list-none">
+          <ul id="palette-list" class="max-h-80 overflow-auto p-1.5 m-0 list-none" role="listbox" aria-label="搜索结果">
             <li
               v-for="(i, idx) in items"
+              :id="`palette-opt-${idx}`"
               :key="i.kind + i.target"
               @click="go(i)"
               @mousemove="activeIdx = idx"
               class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl cursor-pointer text-sm"
               :class="idx === activeIdx ? 'item-active' : 'text-fg-soft'"
+              role="option"
+              :aria-selected="idx === activeIdx"
             >
               <span :class="i.icon" class="text-base shrink-0" />
               <span class="shrink-0">{{ i.title }}</span>

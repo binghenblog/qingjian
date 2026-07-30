@@ -1,23 +1,35 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
+import type { RouteRecordRaw } from 'vue-router'
 import Dashboard from '@/views/Dashboard.vue'
+import i18n from '@/i18n'
 
 // Tauri 内运行在 file:// 下，统一使用 hash 路由更稳。
+declare module 'vue-router' {
+  interface RouteMeta {
+    /** 页面标题的 i18n key（审查 M-29 / L-8） */
+    titleKey?: string
+  }
+}
+
+const routes: RouteRecordRaw[] = [
+  { path: '/', name: 'dashboard', component: Dashboard, meta: { titleKey: 'nav.dashboard' } },
+  { path: '/notes', name: 'notes', component: () => import('@/views/Notes.vue'), meta: { titleKey: 'nav.notes' } },
+  { path: '/todos', name: 'todos', component: () => import('@/views/Todos.vue'), meta: { titleKey: 'nav.todos' } },
+  { path: '/ai', name: 'ai', component: () => import('@/views/AI.vue'), meta: { titleKey: 'nav.ai' } },
+  { path: '/settings', name: 'settings', component: () => import('@/views/Settings.vue'), meta: { titleKey: 'nav.settings' } },
+  // 兜底：未知路径回仪表盘（审查 L-1）
+  { path: '/:pathMatch(.*)*', redirect: '/' }
+]
+
 const router = createRouter({
   history: createWebHashHistory(),
-  routes: [
-    { path: '/', name: 'dashboard', component: Dashboard, meta: { title: '仪表盘' } },
-    { path: '/notes', name: 'notes', component: () => import('@/views/Notes.vue'), meta: { title: '笔记' } },
-    { path: '/todos', name: 'todos', component: () => import('@/views/Todos.vue'), meta: { title: '待办' } },
-    { path: '/ai', name: 'ai', component: () => import('@/views/AI.vue'), meta: { title: 'AI 助手' } },
-    { path: '/settings', name: 'settings', component: () => import('@/views/Settings.vue'), meta: { title: '设置' } },
-    // 兜底：未知路径回仪表盘（审查 L-1）
-    { path: '/:pathMatch(.*)*', redirect: '/' }
-  ]
+  routes
 })
 
-// 同步页面标题（审查 L-2）
+// 同步页面标题（审查 L-2 / M-29）：经 i18n 渲染
 router.afterEach((to) => {
-  const title = to.meta.title as string | undefined
+  const key = to.meta.titleKey as string | undefined
+  const title = key ? i18n.global.t(key) : ''
   document.title = title ? `${title} · 青简` : '青简'
 })
 

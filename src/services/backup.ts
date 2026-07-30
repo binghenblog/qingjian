@@ -1,5 +1,6 @@
 import { storage, type NoteRecord } from './storage'
 import type { TodoRecord } from '@/types'
+import { le } from '@/i18n/errors'
 
 /**
  * 青简全量备份 / 恢复（M4）
@@ -93,16 +94,17 @@ export async function exportToFile(): Promise<void> {
 
 /** 校验备份文件结构；返回错误信息（null = 通过） */
 export function validateBackup(data: unknown): string | null {
-  if (!data || typeof data !== 'object') return '文件内容不是有效的 JSON 对象'
+  if (!data || typeof data !== 'object') return le('errors.backupNotJson')
   const b = data as Partial<BackupFile>
-  if (b.app !== 'qingjian') return '不是青简的备份文件（缺少 app 标识）'
-  if (typeof b.version !== 'number') return '备份文件缺少版本号'
-  if (b.version > BACKUP_VERSION) return `备份版本 v${b.version} 高于当前支持的 v${BACKUP_VERSION}，请升级应用`
-  if (!Array.isArray(b.notes) || !Array.isArray(b.todos)) return '备份数据不完整（notes / todos 缺失）'
+  if (b.app !== 'qingjian') return le('errors.backupNotQingjian')
+  if (typeof b.version !== 'number') return le('errors.backupNoVersion')
+  if (b.version > BACKUP_VERSION)
+    return le('errors.backupVersionTooNew', { version: b.version, current: BACKUP_VERSION })
+  if (!Array.isArray(b.notes) || !Array.isArray(b.todos)) return le('errors.backupIncomplete')
   // 逐元素结构校验（审查 M-19）：缺少 id 会导致 IndexedDB 写入异常
   for (const n of b.notes as unknown[]) {
     if (!n || typeof n !== 'object' || typeof (n as Record<string, unknown>).id !== 'string') {
-      return '笔记数据损坏：存在缺少 id 的条目'
+      return le('errors.backupNoteCorrupt')
     }
   }
   return null
@@ -197,7 +199,7 @@ export function readBackupFile(file: File): Promise<BackupFile> {
   return new Promise((resolve, reject) => {
     // 超大文件（>50MB）一次性读入内存有溢出风险，先拒绝（审查 M-21）
     if (file.size > 50 * 1024 * 1024) {
-      reject(new Error('备份文件过大（超过 50MB），已拒绝以免内存溢出'))
+      reject(new Error(le('errors.backupTooLarge')))
       return
     }
     const reader = new FileReader()
@@ -207,10 +209,10 @@ export function readBackupFile(file: File): Promise<BackupFile> {
         const err = validateBackup(data)
         err ? reject(new Error(err)) : resolve(data as BackupFile)
       } catch {
-        reject(new Error('文件不是有效的 JSON'))
+        reject(new Error(le('errors.backupParse')))
       }
     }
-    reader.onerror = () => reject(new Error('文件读取失败'))
+    reader.onerror = () => reject(new Error(le('errors.backupRead')))
     reader.readAsText(file)
   })
 }

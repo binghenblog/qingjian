@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { storage, isStorageAvailable, type NoteRecord } from '@/services/storage'
+import { le } from '@/i18n/errors'
 
 /** 入库前转纯对象：剥离 Vue 响应式 Proxy，避免 IndexedDB 结构化克隆失败 */
 function toPlain(n: NoteRecord): NoteRecord {
@@ -40,7 +41,7 @@ export const useNoteStore = defineStore('notes', () => {
   async function load() {
     if (loaded.value || loadError.value) return
     if (!isStorageAvailable()) {
-      loadError.value = '当前浏览器禁用了本地数据库（IndexedDB），笔记无法持久化。请检查隐私/无痕模式设置。'
+      loadError.value = le('errors.idbDisabled')
       return
     }
     try {
@@ -59,7 +60,7 @@ export const useNoteStore = defineStore('notes', () => {
       loaded.value = true
     } catch (e) {
       // 写盘/读取失败：暴露错误，UI 显示降级提示（审查 H-8），不再卡在加载态
-      loadError.value = e instanceof Error ? e.message : '本地数据库读取失败，笔记加载不出来'
+      loadError.value = e instanceof Error ? e.message : le('errors.idbReadFailed')
     }
   }
 
@@ -108,7 +109,7 @@ export const useNoteStore = defineStore('notes', () => {
       affected.forEach((n) => (n.folder = name))
       folders.value = prevFolders
       persistFolders()
-      lastError.value = `删除文件夹失败：${(e as Error).message}`
+      lastError.value = le('errors.removeFolderFailed', { msg: (e as Error).message })
       throw e
     }
   }
@@ -136,7 +137,7 @@ export const useNoteStore = defineStore('notes', () => {
       return n
     } catch (e) {
       // 写盘失败：不污染内存态，回滚（审查 L-39）
-      lastError.value = `新建笔记失败：${(e as Error).message}`
+      lastError.value = le('errors.createNoteFailed', { msg: (e as Error).message })
       throw e
     }
   }
@@ -158,7 +159,7 @@ export const useNoteStore = defineStore('notes', () => {
       lastError.value = null
     } catch (e) {
       Object.assign(n, snapshot)
-      lastError.value = `保存失败：${(e as Error).message}`
+      lastError.value = le('errors.saveFailed', { msg: (e as Error).message })
       throw e
     }
   }

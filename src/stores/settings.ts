@@ -85,19 +85,27 @@ export const useSettingsStore = defineStore('settings', () => {
   const aiKeyRemember = ref(s.aiKeyRemember)
   const aiApiKey = ref(loadKey(s.aiKeyRemember))
 
-  // 主设置（不含 Key）
-  watch([userName, aiProvider, aiBaseUrl, aiModel, aiKeyRemember], () =>
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        userName: userName.value,
-        aiProvider: aiProvider.value,
-        aiBaseUrl: aiBaseUrl.value,
-        aiModel: aiModel.value,
-        aiKeyRemember: aiKeyRemember.value
-      })
-    )
-  )
+  // 主设置（不含 Key）：写盘加 200ms 防抖，避免每个 ref 变化都立即同步 localStorage（审查 M-9）
+  let settingsTimer: number | undefined
+  watch([userName, aiProvider, aiBaseUrl, aiModel, aiKeyRemember], () => {
+    clearTimeout(settingsTimer)
+    settingsTimer = window.setTimeout(() => {
+      try {
+        localStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify({
+            userName: userName.value,
+            aiProvider: aiProvider.value,
+            aiBaseUrl: aiBaseUrl.value,
+            aiModel: aiModel.value,
+            aiKeyRemember: aiKeyRemember.value
+          })
+        )
+      } catch {
+        /* localStorage 不可用（隐私模式 / 配额满）时静默忽略 */
+      }
+    }, 200)
+  })
 
   // Key 单独持久化，跟随「记住」开关迁移存储位置
   watch([aiApiKey, aiKeyRemember], () => persistKey(aiApiKey.value, aiKeyRemember.value))

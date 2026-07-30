@@ -5,6 +5,7 @@ import { useTheme, type ThemeMode } from '@/composables/useTheme'
 import { useSettingsStore, type AIProviderType } from '@/stores/settings'
 import { useNoteStore } from '@/stores/notes'
 import { useTodoStore } from '@/stores/todos'
+import { useConfirm } from '@/composables/useConfirm'
 import { exportToFile, readBackupFile, importBackup, type ImportMode } from '@/services/backup'
 
 const { theme, setTheme } = useTheme()
@@ -12,6 +13,7 @@ const settings = useSettingsStore()
 const noteStore = useNoteStore()
 const todoStore = useTodoStore()
 const { t } = useI18n()
+const { confirm } = useConfirm()
 
 onMounted(() => noteStore.load())
 
@@ -30,9 +32,9 @@ async function onExport() {
   try {
     busy.value = true
     await exportToFile()
-    dataMsg.value = { type: 'ok', text: '备份文件已下载（不含 API Key）' }
+    dataMsg.value = { type: 'ok', text: t('settings.exported') }
   } catch (e) {
-    dataMsg.value = { type: 'err', text: `导出失败：${(e as Error).message}` }
+    dataMsg.value = { type: 'err', text: t('settings.exportFailed', { msg: (e as Error).message }) }
   } finally {
     busy.value = false
   }
@@ -54,7 +56,12 @@ async function onFileChosen(e: Event) {
   if (!file) return
   if (
     importMode.value === 'replace' &&
-    !confirm('覆盖导入会清空当前所有笔记与待办，并用备份内容替换。确定继续吗？')
+    !(await confirm({
+      title: t('settings.importReplaceTitle'),
+      message: t('settings.importReplaceMsg'),
+      confirmText: t('settings.importReplace'),
+      danger: true
+    }))
   )
     return
   try {
@@ -67,19 +74,23 @@ async function onFileChosen(e: Event) {
       todoStore.reload()
       dataMsg.value = {
         type: 'ok',
-        text: `导入成功：笔记 ${r.notes} 条、待办 ${r.todos} 条（${importMode.value === 'merge' ? '合并' : '覆盖'}模式）。数据已自动刷新。`
+        text: t('settings.importSuccess', {
+          notes: r.notes,
+          todos: r.todos,
+          mode: importMode.value === 'merge' ? t('settings.importMerge') : t('settings.importReplace')
+        })
       }
       needReload.value = false
     } catch {
       // 刷新失败（如 IndexedDB 不可用）再退回手动整页刷新
       dataMsg.value = {
         type: 'ok',
-        text: `导入成功：笔记 ${r.notes} 条、待办 ${r.todos} 条。点击右侧按钮刷新以载入新数据。`
+        text: t('settings.importSuccessManual', { notes: r.notes, todos: r.todos })
       }
       needReload.value = true
     }
   } catch (err) {
-    dataMsg.value = { type: 'err', text: `导入失败：${(err as Error).message}` }
+    dataMsg.value = { type: 'err', text: t('settings.importFailed', { msg: (err as Error).message }) }
   } finally {
     busy.value = false
   }

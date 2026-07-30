@@ -17,10 +17,12 @@ if (import.meta.hot) {
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useNoteStore } from '@/stores/notes'
+import { useConfirm } from '@/composables/useConfirm'
 import { md } from '@/services/markdown'
 
 const store = useNoteStore()
 const { t } = useI18n()
+const { confirm } = useConfirm()
 
 const mode = ref<'edit' | 'preview' | 'split'>('edit')
 const search = ref('')
@@ -48,7 +50,13 @@ function confirmAddFolder() {
   folderDraft.value = ''
 }
 async function delFolder(name: string) {
-  if (!confirm(`删除文件夹「${name}」？该文件夹下的笔记会归入「未分类」`)) return
+  const ok = await confirm({
+    title: t('notes.deleteFolderTitle'),
+    message: t('notes.deleteFolderMsg', { name }),
+    confirmText: t('notes.deleteFolder'),
+    danger: true
+  })
+  if (!ok) return
   await store.removeFolder(name)
   if (activeFolder.value === name) activeFolder.value = '__all'
 }
@@ -129,6 +137,8 @@ function flushSave(): Promise<void> {
 }
 
 let watchedId: string | null = null
+/** Tauri 窗口关闭监听的取消函数（审查 M-2） */
+let unlistenClose: (() => void) | undefined
 watch(
   () => [store.current?.id, store.current?.title, store.current?.content] as const,
   () => {
@@ -158,6 +168,7 @@ onUnmounted(() => {
   void flushSave()
   clearTimeout(searchTimer)
   window.removeEventListener('beforeunload', beforeUnloadFlush)
+  unlistenClose?.()
 })
 
 function fmt(ts: number) {
@@ -171,7 +182,15 @@ async function newNote() {
 }
 
 async function del() {
-  if (store.current && confirm(`删除笔记「${store.current.title || '无标题笔记'}」？此操作不可撤销`)) {
+  if (
+    store.current &&
+    (await confirm({
+      title: t('notes.deleteNoteTitle'),
+      message: t('notes.deleteNoteMsg', { title: store.current.title || t('notes.untitled') }),
+      confirmText: t('notes.deleteNote'),
+      danger: true
+    }))
+  ) {
     await store.remove(store.current.id)
   }
 }
@@ -204,10 +223,15 @@ onMounted(() => {
   if (!store.loaded) store.load()
   window.addEventListener('beforeunload', beforeUnloadFlush)
   // 桌面端：窗口关闭事件由 Tauri 派发，WebView 销毁前主动冲刷（审查 H-13）
+  // 保存 unlisten，避免组件重复挂载时监听器累积（审查 M-2）
   const w = window as unknown as { __TAURI__?: unknown }
   if (w.__TAURI__) {
     import('@tauri-apps/api/event')
-      .then(({ listen }) => listen('tauri://close-requested', () => void flushSave()))
+      .then(({ listen }) =>
+        listen('tauri://close-requested', () => void flushSave()).then((un) => {
+          unlistenClose = un
+        })
+      )
       .catch(() => {})
   }
 })
@@ -371,6 +395,7 @@ onMounted(() => {
             @change="onMoveFolder"
             class="folder-select text-xs rounded-lg px-2 py-1.5 outline-none cursor-pointer shrink-0"
             :title="t('notes.moveToFolder')"
+            :aria-label="t('notes.moveToFolder')"
           >
             <option value="">{{ t('notes.folderUncategorized') }}</option>
             <option v-for="f in store.folders" :key="f" :value="f">{{ f }}</option>

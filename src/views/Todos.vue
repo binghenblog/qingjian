@@ -2,12 +2,14 @@
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useTodoStore, PRESET_CATEGORIES } from '@/stores/todos'
+import { useConfirm } from '@/composables/useConfirm'
 import TodoBadges from '@/components/TodoBadges.vue'
 import type { TodoPriority } from '@/types'
 import { DAILY_CATEGORY } from '@/types'
 
 const store = useTodoStore()
 const { t } = useI18n()
+const { confirm } = useConfirm()
 
 /** 当前分类：默认「每日」 */
 const activeCat = ref(DAILY_CATEGORY)
@@ -65,8 +67,14 @@ function confirmAddCat() {
   }
 }
 
-function delCategory(cat: string) {
-  if (!confirm(`删除分类「${cat}」？该分类下的任务会移入「生活」`)) return
+async function delCategory(cat: string) {
+  const ok = await confirm({
+    title: t('todos.deleteCategoryTitle'),
+    message: t('todos.deleteCategoryMsg', { cat }),
+    confirmText: t('todos.deleteCategory'),
+    danger: true
+  })
+  if (!ok) return
   store.removeCategory(cat)
   if (activeCat.value === cat) activeCat.value = DAILY_CATEGORY
 }

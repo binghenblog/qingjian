@@ -1,4 +1,5 @@
 import { isTauri, TauriCloudProvider } from './tauri'
+import { le } from '@/i18n/errors'
 
 export type ChatRole = 'system' | 'user' | 'assistant'
 
@@ -62,23 +63,23 @@ const BLOCKED_CLOUD_PREFIX = ['169.254.', 'fe80.', '::']
 function assertSafeUrl(raw: string, kind: 'local' | 'cloud'): string {
   const base = raw.trim()
   if (!base) {
-    throw new Error(kind === 'cloud' ? '请先在设置中填写云端接口地址' : '请先在设置中填写 Ollama 接口地址')
+    throw new Error(le(kind === 'cloud' ? 'errors.aiUrlCloud' : 'errors.aiUrlLocal'))
   }
   let url: URL
   try {
     url = new URL(base)
   } catch {
-    throw new Error('接口地址格式不正确，需以 http:// 或 https:// 开头')
+    throw new Error(le('errors.aiUrlInvalid'))
   }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    throw new Error(`不支持的协议 ${url.protocol}，仅允许 http/https`)
+    throw new Error(le('errors.aiProtocolUnsupported', { protocol: url.protocol }))
   }
   if (kind === 'cloud') {
     const host = url.hostname.toLowerCase()
     const blocked =
       BLOCKED_CLOUD_HOSTS.includes(host) ||
       BLOCKED_CLOUD_PREFIX.some((p) => host.startsWith(p))
-    if (blocked) throw new Error('接口地址指向受限内部地址，已被安全策略拦截')
+    if (blocked) throw new Error(le('errors.aiBlockedHost'))
   }
   return base.replace(/\/$/, '')
 }
@@ -98,7 +99,7 @@ export class OllamaProvider implements AIProvider {
       body: JSON.stringify({ model: this.cfg.model, messages, stream: true }),
       signal
     })
-    if (!res.ok || !res.body) throw new Error(`Ollama 连接失败 (${res.status})，确认本地已启动 Ollama`)
+    if (!res.ok || !res.body) throw new Error(le('errors.ollamaConnect', { status: res.status }))
     for await (const line of readLines(res.body)) {
       try {
         const obj = JSON.parse(line)
@@ -145,7 +146,7 @@ export class CloudProvider implements AIProvider {
     })
     if (!res.ok || !res.body) {
       const txt = await res.text().catch(() => '')
-      throw new Error(`云端请求失败 (${res.status})${txt ? ': ' + txt.slice(0, 200) : ''}`)
+      throw new Error(le('errors.cloudFailed', { status: res.status, detail: txt ? ': ' + txt.slice(0, 200) : '' }))
     }
     for await (const line of readLines(res.body)) {
       if (!line.startsWith('data:')) continue

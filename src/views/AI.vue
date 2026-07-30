@@ -139,8 +139,8 @@ async function send() {
       <RouterLink to="/settings" class="text-brand-strong hover:underline" :class="{ 'ml-auto': !bubbles.length }">{{ t('ai.goToSettings') }}</RouterLink>
     </div>
 
-    <!-- 对话区 -->
-    <div ref="scrollEl" class="flex-1 overflow-auto space-y-4 pb-4">
+    <!-- 对话区（role=log：屏幕阅读器可感知新回复追加，审查 H-12） -->
+    <div ref="scrollEl" class="flex-1 overflow-auto space-y-4 pb-4" role="log" aria-live="polite" aria-label="对话记录">
       <!-- 空状态 -->
       <div v-if="bubbles.length === 0" class="grid place-items-center h-full text-center">
         <div>

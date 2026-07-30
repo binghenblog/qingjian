@@ -9,6 +9,10 @@ export default {
     footer: '本地优先 · 数据在你手中',
     version: 'v0.1.0'
   },
+  common: {
+    confirm: '确定',
+    cancel: '取消'
+  },
   nav: {
     dashboard: '今日桌面',
     notes: '笔记',
@@ -78,6 +82,13 @@ export default {
     importReplace: '导入（覆盖）',
     reloadBtn: '刷新页面载入新数据',
     backupHint: '合并：按 id 去重，同一笔记保留较新版本；覆盖：清空当前数据后整体恢复（会先确认）。备份不包含 API Key。',
+    importReplaceTitle: '覆盖导入',
+    importReplaceMsg: '覆盖导入会清空当前所有笔记与待办，并用备份内容替换。确定继续吗？',
+    exported: '备份文件已下载（不含 API Key）',
+    exportFailed: '导出失败：{msg}',
+    importSuccess: '导入成功：笔记 {notes} 条、待办 {todos} 条（{mode}）。数据已自动刷新。',
+    importSuccessManual: '导入成功：笔记 {notes} 条、待办 {todos} 条。点击右侧按钮刷新以载入新数据。',
+    importFailed: '导入失败：{msg}',
     shortcutTitle: '快捷键',
     shortcutHint: '随时随地快速跳转'
   },
@@ -91,6 +102,10 @@ export default {
     folderNamePlaceholder: '名称',
     newFolder: '新建文件夹',
     deleteFolder: '删除文件夹',
+    deleteFolderTitle: '删除文件夹',
+    deleteFolderMsg: '删除文件夹「{name}」？该文件夹下的笔记会归入「未分类」',
+    deleteNoteTitle: '删除笔记',
+    deleteNoteMsg: '删除笔记「{title}」？此操作不可撤销',
     searchCount: '在全部 {total} 条笔记中搜索，共 {matched} 条匹配',
     blankNote: '空白笔记',
     emptyNoMatch: '没有匹配的笔记',
@@ -113,6 +128,8 @@ export default {
   todos: {
     title: '待办 / 任务',
     deleteCategory: '删除分类',
+    deleteCategoryTitle: '删除分类',
+    deleteCategoryMsg: '删除分类「{cat}」？该分类下的任务会归入「生活」',
     catNamePlaceholder: '分类名',
     confirm: '确定',
     custom: '自定义',
@@ -160,8 +177,33 @@ export default {
     errorBody: '⚠️ {msg}\n\n如为云端通道，纯 Web 端可能受 CORS 限制；桌面版会经本地后端中转解决此问题。'
   },
   palette: {
+    title: '命令面板',
     searchPlaceholder: '搜索页面、笔记全文…',
     noteKind: '笔记',
     noResult: '没有匹配的结果'
+  },
+  // 服务层 / Store 层错误文案（审查 H-14）：这些层无组件上下文，经 i18n.global.t 渲染
+  errors: {
+    aiUrlCloud: '请先在设置中填写云端接口地址',
+    aiUrlLocal: '请先在设置中填写 Ollama 接口地址',
+    aiUrlInvalid: '接口地址格式不正确，需以 http:// 或 https:// 开头',
+    aiProtocolUnsupported: '不支持的协议 {protocol}，仅允许 http/https',
+    aiBlockedHost: '接口地址指向受限内部地址，已被安全策略拦截',
+    ollamaConnect: 'Ollama 连接失败 ({status})，确认本地已启动 Ollama',
+    cloudFailed: '云端请求失败 ({status}){detail}',
+    idbDisabled: '当前浏览器禁用了本地数据库（IndexedDB），笔记无法持久化。请检查隐私/无痕模式设置。',
+    idbReadFailed: '本地数据库读取失败，笔记加载不出来',
+    removeFolderFailed: '删除文件夹失败：{msg}',
+    createNoteFailed: '新建笔记失败：{msg}',
+    saveFailed: '保存失败：{msg}',
+    backupNotJson: '文件内容不是有效的 JSON 对象',
+    backupNotQingjian: '不是青简的备份文件（缺少 app 标识）',
+    backupNoVersion: '备份文件缺少版本号',
+    backupVersionTooNew: '备份版本 v{version} 高于当前支持的 v{current}，请升级应用',
+    backupIncomplete: '备份数据不完整（notes / todos 缺失）',
+    backupNoteCorrupt: '笔记数据损坏：存在缺少 id 的条目',
+    backupTooLarge: '备份文件过大（超过 50MB），已拒绝以免内存溢出',
+    backupParse: '文件不是有效的 JSON',
+    backupRead: '文件读取失败'
   }
 }

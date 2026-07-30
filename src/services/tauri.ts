@@ -60,6 +60,10 @@ async function* tauriChat(
       () => {
         aborted = true
         finished = true
+        // 通知 Rust 端中止正在进行的 HTTP 流（审查 H-8）
+        core
+          .invoke('cancel_ai_chat')
+          .catch(() => {})
         resolveWait()
       },
       { once: true }

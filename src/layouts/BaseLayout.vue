@@ -1,14 +1,21 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import CommandPalette from '@/components/CommandPalette.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { useShortcuts } from '@/composables/useShortcuts'
 
 useShortcuts()
 const route = useRoute()
 const paletteOpen = ref(false)
 const { t } = useI18n()
+
+/** 当前页标题：经 i18n 渲染（审查 M-29 / L-8） */
+const pageTitle = computed(() => {
+  const k = route.meta.titleKey
+  return typeof k === 'string' ? t(k) : t('app.name')
+})
 
 const nav = [
   { to: '/', key: 'nav.dashboard', icon: 'i-carbon-dashboard' },
@@ -83,7 +90,7 @@ function openPalette() {
     <main class="flex-1 overflow-hidden p-4 md:p-5">
       <div class="card h-full flex flex-col overflow-hidden">
         <header class="h-14 px-4 md:px-6 flex items-center justify-between border-b border-border shrink-0">
-          <span class="font-semibold truncate">{{ route.meta.title || t('app.name') }}</span>
+          <span class="font-semibold truncate">{{ pageTitle }}</span>
           <span class="text-xs text-fg-faint hidden sm:inline">{{ t('app.footer') }}</span>
         </header>
         <div class="flex-1 overflow-auto p-4 md:p-6">
@@ -93,6 +100,7 @@ function openPalette() {
     </main>
 
     <CommandPalette v-model:open="paletteOpen" />
+    <ConfirmDialog />
   </div>
 </template>
 

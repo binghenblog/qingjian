@@ -68,6 +68,13 @@ export function yesterdayKey(): string {
   return prevDayKey(dateKey())
 }
 
+/** 距今 n 天前的 YYYY-MM-DD（纯日历运算，DST 安全） */
+export function dateKeyDaysAgo(n: number): string {
+  const d = new Date()
+  d.setDate(d.getDate() - n)
+  return dateKey(d)
+}
+
 function loadTodos(): TodoRecord[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -111,10 +118,16 @@ export const useTodoStore = defineStore('todos', () => {
     todos,
     (v) => {
       clearTimeout(persistTimer)
-      persistTimer = window.setTimeout(
-        () => localStorage.setItem(STORAGE_KEY, JSON.stringify(v)),
-        200
-      )
+    persistTimer = window.setTimeout(
+      () => {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(v))
+        } catch {
+          /* localStorage 不可用（隐私模式 / 配额满）时静默忽略 */
+        }
+      },
+      200
+    )
     },
     { deep: true }
   )
@@ -142,6 +155,8 @@ export const useTodoStore = defineStore('todos', () => {
 
   /** 重新从 localStorage 读取（审查 M-46）：备份导入后刷新内存态，避免 UI 显示旧数据 */
   function reload() {
+    // 先清掉防抖 timer：导入后若旧 timer 触发，会用导入前的旧数据覆盖刚写入的结果（审查 H-4）
+    clearTimeout(persistTimer)
     todos.value = loadTodos()
     categories.value = loadCategories()
   }
@@ -168,11 +183,24 @@ export const useTodoStore = defineStore('todos', () => {
       })
   }
 
-  /** 分类进度 { done, total, rate } */
+  /** 分类进度缓存：todos 变化时一次性算好各分类 { done, total, rate }，避免模板每渲染都全量遍历（审查 M-8） */
+  const progressCache = computed(() => {
+    const map: Record<string, { done: number; total: number; rate: number }> = {}
+    for (const cat of categories.value) {
+      const list = todos.value.filter((t) => t.category === cat)
+      const done = list.filter((t) => isDone(t)).length
+      map[cat] = {
+        done,
+        total: list.length,
+        rate: list.length ? Math.round((done / list.length) * 100) : 0
+      }
+    }
+    return map
+  })
+
+  /** 取某分类进度（来自缓存，审查 M-8） */
   function categoryProgress(cat: string) {
-    const list = todos.value.filter((t) => t.category === cat)
-    const done = list.filter((t) => isDone(t)).length
-    return { done, total: list.length, rate: list.length ? Math.round((done / list.length) * 100) : 0 }
+    return progressCache.value[cat] ?? { done: 0, total: 0, rate: 0 }
   }
 
   /** 昨日未完成的每日任务数（任务需在昨天前创建才计入） */
@@ -262,13 +290,20 @@ export const useTodoStore = defineStore('todos', () => {
   }
 
   function toggle(id: string) {
-    const t = todos.value.find((t) => t.id === id)
+    const t = todos.value.find((x) => x.id === id)
     if (!t) return
     if (t.category === DAILY_CATEGORY) {
       const today = dateKey()
       const dates = (t.doneDates ??= [])
       const i = dates.indexOf(today)
-      i >= 0 ? dates.splice(i, 1) : dates.push(today)
+      if (i >= 0) {
+        dates.splice(i, 1)
+      } else {
+        dates.push(today)
+        // 裁剪：长期使用的每日任务 doneDates 会无限增长，仅保留最近 365 天（审查 H-13 / M-4）
+        const cutoff = dateKeyDaysAgo(365)
+        if (dates.length > 365) t.doneDates = dates.filter((d) => d >= cutoff)
+      }
     } else {
       t.done = !t.done
       t.completedAt = t.done ? Date.now() : undefined
