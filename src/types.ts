@@ -18,8 +18,6 @@ export interface TodoRecord {
   doneDates?: string[]
   /** 普通任务完成时间戳（用于按日统计） */
   completedAt?: number
-  dueDate?: number
-  noteId?: string
   createdAt: number
 }
 

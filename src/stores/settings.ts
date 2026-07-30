@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
+import i18n from '@/i18n'
 
 export type AIProviderType = 'local' | 'cloud'
 
@@ -13,6 +14,8 @@ interface SettingsState {
   aiModel: string
   /** 是否把 API Key 持久化到 localStorage（默认否，仅存会话） */
   aiKeyRemember: boolean
+  /** 界面语言（审查 L-38 多语种） */
+  locale: string
 }
 
 function load(): SettingsState {
@@ -21,7 +24,8 @@ function load(): SettingsState {
     aiProvider: 'local',
     aiBaseUrl: 'http://127.0.0.1:11434',
     aiModel: 'llama3',
-    aiKeyRemember: false
+    aiKeyRemember: false,
+    locale: 'zh-CN'
   }
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -84,10 +88,16 @@ export const useSettingsStore = defineStore('settings', () => {
   const aiModel = ref(s.aiModel)
   const aiKeyRemember = ref(s.aiKeyRemember)
   const aiApiKey = ref(loadKey(s.aiKeyRemember))
+  const locale = ref(s.locale)
+
+  // 语言切换：写入 i18n 全局 locale，界面即时更新（审查 L-38）
+  watch(locale, (code) => {
+    i18n.global.locale.value = code as 'zh-CN' | 'en-US'
+  })
 
   // 主设置（不含 Key）：写盘加 200ms 防抖，避免每个 ref 变化都立即同步 localStorage（审查 M-9）
   let settingsTimer: number | undefined
-  watch([userName, aiProvider, aiBaseUrl, aiModel, aiKeyRemember], () => {
+  watch([userName, aiProvider, aiBaseUrl, aiModel, aiKeyRemember, locale], () => {
     clearTimeout(settingsTimer)
     settingsTimer = window.setTimeout(() => {
       try {
@@ -98,7 +108,8 @@ export const useSettingsStore = defineStore('settings', () => {
             aiProvider: aiProvider.value,
             aiBaseUrl: aiBaseUrl.value,
             aiModel: aiModel.value,
-            aiKeyRemember: aiKeyRemember.value
+            aiKeyRemember: aiKeyRemember.value,
+            locale: locale.value
           })
         )
       } catch {
@@ -110,5 +121,5 @@ export const useSettingsStore = defineStore('settings', () => {
   // Key 单独持久化，跟随「记住」开关迁移存储位置
   watch([aiApiKey, aiKeyRemember], () => persistKey(aiApiKey.value, aiKeyRemember.value))
 
-  return { userName, aiProvider, aiBaseUrl, aiApiKey, aiModel, aiKeyRemember }
+  return { userName, aiProvider, aiBaseUrl, aiApiKey, aiModel, aiKeyRemember, locale }
 })

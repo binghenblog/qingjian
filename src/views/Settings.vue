@@ -7,6 +7,7 @@ import { useNoteStore } from '@/stores/notes'
 import { useTodoStore } from '@/stores/todos'
 import { useConfirm } from '@/composables/useConfirm'
 import { exportToFile, readBackupFile, importBackup, type ImportMode } from '@/services/backup'
+import { SUPPORTED_LOCALES } from '@/i18n'
 
 const { theme, setTheme } = useTheme()
 const settings = useSettingsStore()
@@ -116,6 +117,8 @@ const channels: { value: AIProviderType; label: string; icon: string }[] = [
   { value: 'local', label: 'settings.channelLocal', icon: 'i-carbon-laptop' },
   { value: 'cloud', label: 'settings.channelCloud', icon: 'i-carbon-cloud' }
 ]
+
+const locales = SUPPORTED_LOCALES
 </script>
 
 <template>
@@ -152,6 +155,21 @@ const channels: { value: AIProviderType; label: string; icon: string }[] = [
           {{ t(m.label) }}
         </button>
       </div>
+    </section>
+
+    <!-- 语言 -->
+    <section class="setting-card rounded-2xl p-5">
+      <div class="font-semibold text-sm mb-1">{{ t('settings.langTitle') }}</div>
+      <p class="text-xs text-fg-faint mt-0 mb-3">{{ t('settings.langHint') }}</p>
+      <label class="field max-w-xs">
+        <select
+          v-model="settings.locale"
+          class="input-modern w-full px-3 py-2 text-sm"
+          :aria-label="t('settings.langAria')"
+        >
+          <option v-for="l in locales" :key="l.code" :value="l.code">{{ l.label }}</option>
+        </select>
+      </label>
     </section>
 
     <!-- AI 通道 -->
