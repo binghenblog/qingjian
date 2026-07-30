@@ -283,19 +283,7 @@ function addProgress() {
   box-shadow: var(--shadow-sm);
 }
 
-.check {
-  border: 2px solid var(--c-border);
-  background: transparent;
-  transition: border-color 0.15s ease, background-color 0.15s ease;
-}
-.check:hover {
-  border-color: var(--c-brand);
-  background: var(--c-brand-soft);
-}
-.check-done {
-  border-color: var(--c-brand);
-  background: var(--c-brand-grad);
-}
+/* .check / .check-done 已抽取到全局 theme.css（审查 M-23） */
 
 .empty { border: 1.5px dashed var(--c-border); }
 

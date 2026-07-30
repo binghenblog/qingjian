@@ -349,6 +349,12 @@ const locales = SUPPORTED_LOCALES
   border-color: #dc262666;
   background: #dc26261a;
 }
+/* 暗色下加深红色对比度（审查 M-22）：用更亮的红 #f87171 */
+.dark .data-btn-danger:hover:not(:disabled) {
+  color: #f87171;
+  border-color: #f8716655;
+  background: #f871661a;
+}
 .data-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .msg-ok { color: var(--c-brand-strong); }

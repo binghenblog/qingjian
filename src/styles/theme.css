@@ -14,7 +14,7 @@
   --c-surface-hover: #f1f4f8;
   --c-fg: #111827;
   --c-fg-soft: #374151;
-  --c-fg-faint: #4b5563;
+  --c-fg-faint: #3f4b5b;
   --c-border: #e5e7eb;
 
   /* 阴影 */
@@ -235,3 +235,13 @@ textarea:focus-visible,
     scroll-behavior: auto !important;
   }
 }
+
+/* 通用复选框（Todos / Dashboard 共享，审查 M-23）：原先两处样式完全重复，抽到全局 */
+.check {
+  border: 2px solid var(--c-border);
+  background: transparent;
+  border-radius: 6px;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.check:hover { border-color: var(--c-brand); background: var(--c-brand-soft); }
+.check-done { border-color: var(--c-brand); background: var(--c-brand-grad); }

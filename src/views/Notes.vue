@@ -643,6 +643,9 @@ onMounted(() => {
 
 .del-btn { background: transparent; border: none; transition: color 0.15s ease, background-color 0.15s ease; }
 .del-btn:hover { background: #ef44441a; }
+/* 暗色下提升删除按钮对比度（审查 M-21）：常态更亮、hover 用亮红 */
+.dark .del-btn { color: var(--c-fg-soft); }
+.dark .del-btn:hover { color: #f87171; background: #f871661a; }
 
 .ai-btn { background: transparent; border: none; transition: color 0.15s ease, background-color 0.15s ease; }
 .ai-btn:hover { background: var(--c-brand-soft); }
