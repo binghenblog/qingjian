@@ -15,10 +15,12 @@ if (import.meta.hot) {
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useNoteStore } from '@/stores/notes'
 import { md } from '@/services/markdown'
 
 const store = useNoteStore()
+const { t } = useI18n()
 
 const mode = ref<'edit' | 'preview' | 'split'>('edit')
 const search = ref('')
@@ -101,8 +103,8 @@ function highlight(text: string, q: string) {
 
 function highlightTitle(title: string) {
   return searching.value
-    ? highlight(title || '无标题笔记', debouncedSearch.value.trim())
-    : escapeHtml(title || '无标题笔记')
+    ? highlight(title || t('notes.untitled'), debouncedSearch.value.trim())
+    : escapeHtml(title || t('notes.untitled'))
 }
 
 const rendered = computed(() => (store.current ? md.render(store.current.content || '') : ''))
@@ -220,7 +222,7 @@ onMounted(() => {
       role="alert"
     >
       <span class="i-carbon-warning-alt text-base shrink-0" />
-      <span>⚠️ 本地数据库不可用：{{ store.loadError }}</span>
+      <span>{{ t('notes.dbError', { err: store.loadError }) }}</span>
     </div>
     <!-- 左：笔记列表 -->
     <aside class="list-panel flex flex-col rounded-2xl overflow-hidden">
@@ -230,21 +232,21 @@ onMounted(() => {
             <span class="i-carbon-search text-fg-faint text-sm shrink-0" />
             <input
               v-model="search"
-              placeholder="全文搜索标题、内容、标签…"
+              :placeholder="t('notes.searchPlaceholder')"
               class="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-fg-faint"
             />
             <button
               v-if="search"
               @click="search = ''"
               class="clear-btn text-fg-faint hover:text-fg text-xs shrink-0 cursor-pointer"
-              aria-label="清除搜索"
+              :aria-label="t('notes.clearSearch')"
             >✕</button>
           </div>
           <button
             @click="newNote"
             class="new-btn w-9 h-9 flex items-center justify-center shrink-0 cursor-pointer"
-            title="新建笔记"
-            aria-label="新建笔记"
+            :title="t('notes.newNote')"
+            :aria-label="t('notes.newNote')"
           >
             <span class="i-carbon-add text-lg leading-none" />
           </button>
@@ -258,7 +260,7 @@ onMounted(() => {
             :class="{ 'folder-active': activeFolder === '__all' }"
           >
             <span class="i-carbon-folder text-[13px]" />
-            全部
+            {{ t('notes.folderAll') }}
             <span class="chip-count">{{ store.notes.length }}</span>
           </button>
           <button
@@ -277,8 +279,8 @@ onMounted(() => {
               role="button"
               tabindex="0"
               class="chip-del hidden group-hover:inline text-fg-faint hover:text-red-500"
-              title="删除文件夹（笔记归入未分类）"
-              aria-label="删除文件夹"
+              :title="t('notes.deleteFolder')"
+              :aria-label="t('notes.deleteFolder')"
             >×</span>
           </button>
           <button
@@ -288,7 +290,7 @@ onMounted(() => {
             :class="{ 'folder-active': activeFolder === '' }"
           >
             <span class="i-carbon-folder-off text-[13px]" />
-            未分类
+            {{ t('notes.folderUncategorized') }}
             <span class="chip-count">{{ store.folderCounts[''] ?? 0 }}</span>
           </button>
           <!-- 新建文件夹 -->
@@ -300,15 +302,15 @@ onMounted(() => {
             @keyup.esc="addingFolder = false"
             @blur="confirmAddFolder"
             maxlength="8"
-            placeholder="名称"
+            :placeholder="t('notes.folderNamePlaceholder')"
             class="folder-input w-20 text-xs px-2 py-1 rounded-lg outline-none"
           />
-          <button v-else @click="startAddFolder" class="folder-chip folder-add" title="新建文件夹" aria-label="新建文件夹">
+          <button v-else @click="startAddFolder" class="folder-chip folder-add" :title="t('notes.newFolder')" :aria-label="t('notes.newFolder')">
             <span class="i-carbon-add text-[13px]" />
           </button>
         </div>
         <div v-else class="text-[11px] text-fg-faint px-0.5" aria-live="polite">
-          在全部 {{ store.notes.length }} 条笔记中搜索，共 {{ filtered.length }} 条匹配
+          {{ t('notes.searchCount', { total: store.notes.length, matched: filtered.length }) }}
         </div>
       </div>
 
@@ -337,17 +339,17 @@ onMounted(() => {
             v-html="snippetMap[n.id]"
           />
           <div v-else class="text-xs text-fg-faint mt-0.5 truncate">
-            {{ n.content.replace(/[#>*`\-]/g, '').slice(0, 40) || '空白笔记' }}
+            {{ n.content.replace(/[#>*`\-]/g, '').slice(0, 40) || t('notes.blankNote') }}
           </div>
           <div class="flex flex-wrap items-center gap-1 mt-1.5">
             <span v-if="searching && n.folder" class="mini-folder">
               <span class="i-carbon-folder text-[10px]" />{{ n.folder }}
             </span>
-            <span v-for="t in n.tags" :key="t" class="mini-tag">{{ t }}</span>
+            <span v-for="tg in n.tags" :key="tg" class="mini-tag">{{ tg }}</span>
           </div>
         </li>
         <li v-if="filtered.length === 0" class="text-center text-sm text-fg-faint py-10 px-3">
-          {{ search ? '没有匹配的笔记' : activeFolder !== '__all' ? '这个文件夹还是空的' : '还没有笔记，点右上角 + 新建' }}
+          {{ search ? t('notes.emptyNoMatch') : activeFolder !== '__all' ? t('notes.emptyFolder') : t('notes.emptyNone') }}
         </li>
       </ul>
     </aside>
@@ -360,7 +362,7 @@ onMounted(() => {
           <input
             :value="store.current.title"
             @input="store.current && (store.current.title = ($event.target as HTMLInputElement).value)"
-            placeholder="无标题笔记"
+            :placeholder="t('notes.untitled')"
             class="title-input flex-1 text-lg font-semibold bg-transparent outline-none"
           />
           <!-- 移动到文件夹 -->
@@ -368,12 +370,12 @@ onMounted(() => {
             :value="store.current.folder || ''"
             @change="onMoveFolder"
             class="folder-select text-xs rounded-lg px-2 py-1.5 outline-none cursor-pointer shrink-0"
-            title="移动到文件夹"
+            :title="t('notes.moveToFolder')"
           >
-            <option value="">未分类</option>
+            <option value="">{{ t('notes.folderUncategorized') }}</option>
             <option v-for="f in store.folders" :key="f" :value="f">{{ f }}</option>
           </select>
-          <div class="seg flex items-center rounded-lg p-0.5 shrink-0" role="tablist" aria-label="编辑模式">
+          <div class="seg flex items-center rounded-lg p-0.5 shrink-0" role="tablist" :aria-label="t('notes.modeAria')">
             <button
               v-for="m in (['edit','split','preview'] as const)"
               :key="m"
@@ -383,14 +385,14 @@ onMounted(() => {
               class="seg-btn px-2.5 py-1 text-xs rounded-md cursor-pointer"
               :class="mode === m ? 'seg-active' : ''"
             >
-              {{ m === 'edit' ? '编辑' : m === 'split' ? '分屏' : '预览' }}
+              {{ m === 'edit' ? t('notes.modeEdit') : m === 'split' ? t('notes.modeSplit') : t('notes.modePreview') }}
             </button>
           </div>
           <button
             @click="del"
             class="del-btn w-8 h-8 rounded-lg grid place-items-center text-fg-faint hover:text-red-500 cursor-pointer shrink-0"
-            title="删除笔记"
-            aria-label="删除笔记"
+            :title="t('notes.deleteNote')"
+            :aria-label="t('notes.deleteNote')"
           >
             <span class="i-carbon-trash-can text-base" />
           </button>
@@ -398,15 +400,15 @@ onMounted(() => {
 
         <!-- 标签行 -->
         <div class="px-5 py-2 flex items-center gap-1.5 flex-wrap border-b border-border shrink-0">
-          <span v-for="t in store.current.tags" :key="t" class="tag-chip">
-            {{ t }}
-            <button @click="removeTag(t)" class="ml-0.5 text-fg-faint hover:text-red-500" :aria-label="`移除标签 ${t}`">×</button>
+          <span v-for="tg in store.current.tags" :key="tg" class="tag-chip">
+            {{ tg }}
+            <button @click="removeTag(tg)" class="ml-0.5 text-fg-faint hover:text-red-500" :aria-label="t('notes.removeTag', { tag: tg })">×</button>
           </span>
           <input
             v-model="tagDraft"
             @keyup.enter="addTag"
             @blur="addTag"
-            placeholder="+ 标签"
+            :placeholder="t('notes.addTagPlaceholder')"
             class="tag-input text-xs bg-transparent outline-none placeholder:text-fg-faint py-1 w-16"
           />
         </div>
@@ -417,7 +419,7 @@ onMounted(() => {
             <textarea
               :value="store.current.content"
               @input="store.current && (store.current.content = ($event.target as HTMLTextAreaElement).value)"
-              placeholder="开始用 Markdown 书写…"
+              :placeholder="t('notes.editorPlaceholder')"
               class="editor w-full h-full resize-none outline-none p-5 text-sm leading-relaxed"
             />
           </div>
@@ -428,7 +430,7 @@ onMounted(() => {
             <textarea
               :value="store.current.content"
               @input="store.current && (store.current.content = ($event.target as HTMLTextAreaElement).value)"
-              placeholder="开始用 Markdown 书写…"
+              :placeholder="t('notes.editorPlaceholder')"
               class="editor w-full h-full resize-none outline-none p-5 text-sm leading-relaxed"
             />
             <div class="overflow-auto p-5">
@@ -444,11 +446,8 @@ onMounted(() => {
           <span class="chip inline-grid place-items-center w-14 h-14 rounded-2xl mb-3">
             <span class="i-carbon-document text-2xl text-white" />
           </span>
-          <h3 class="font-semibold m-0 mb-1.5">笔记本地持久化已就绪</h3>
-          <p class="text-sm text-fg-faint m-0 leading-relaxed">
-            数据已存入本地 IndexedDB（Dexie），刷新不丢。<br />
-            V1 将支持 Obsidian Vault 直连（wikilinks / 标签 / frontmatter）
-          </p>
+          <h3 class="font-semibold m-0 mb-1.5">{{ t('notes.emptyTitle') }}</h3>
+          <p class="text-sm text-fg-faint m-0 leading-relaxed" v-html="t('notes.emptyHint')" />
         </div>
       </div>
     </section>

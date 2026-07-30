@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useNoteStore } from '@/stores/notes'
 
@@ -8,6 +9,7 @@ const emit = defineEmits<{ 'update:open': [boolean] }>()
 
 const router = useRouter()
 const noteStore = useNoteStore()
+const { t } = useI18n()
 const q = ref('')
 const inputEl = ref<HTMLInputElement>()
 const activeIdx = ref(0)
@@ -15,11 +17,11 @@ const activeIdx = ref(0)
 const prevFocus = ref<HTMLElement | null>(null)
 
 const pages = [
-  { title: '仪表盘', to: '/', icon: 'i-carbon-dashboard' },
-  { title: '笔记', to: '/notes', icon: 'i-carbon-document' },
-  { title: '待办', to: '/todos', icon: 'i-carbon-task' },
-  { title: 'AI 助手', to: '/ai', icon: 'i-carbon-ai-status' },
-  { title: '设置', to: '/settings', icon: 'i-carbon-settings' }
+  { key: 'nav.dashboard', to: '/', icon: 'i-carbon-dashboard' },
+  { key: 'nav.notes', to: '/notes', icon: 'i-carbon-document' },
+  { key: 'nav.todos', to: '/todos', icon: 'i-carbon-task' },
+  { key: 'nav.ai', to: '/ai', icon: 'i-carbon-ai-status' },
+  { key: 'nav.settings', to: '/settings', icon: 'i-carbon-settings' }
 ]
 
 interface PaletteItem {
@@ -35,15 +37,15 @@ interface PaletteItem {
 const items = computed<PaletteItem[]>(() => {
   const query = q.value.trim()
   const pageItems: PaletteItem[] = pages
-    .filter((p) => !query || p.title.includes(query))
-    .map((p) => ({ kind: 'page', title: p.title, icon: p.icon, target: p.to }))
+    .filter((p) => !query || t(p.key).includes(query))
+    .map((p) => ({ kind: 'page', title: t(p.key), icon: p.icon, target: p.to }))
   if (!query) return pageItems
   const noteItems: PaletteItem[] = noteStore.searchNotes(query, 8).map((r) => ({
     kind: 'note',
-    title: r.note.title || '无标题笔记',
+    title: r.note.title || t('notes.untitled'),
     icon: 'i-carbon-document',
     target: r.note.id,
-    hint: r.field === 'title' ? (r.note.folder || '笔记') : r.snippet
+    hint: r.field === 'title' ? (r.note.folder || t('notes.noteLabel')) : r.snippet
   }))
   return [...pageItems, ...noteItems]
 })
@@ -124,7 +126,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
             <input
               ref="inputEl"
               v-model="q"
-              placeholder="搜索页面、笔记全文…"
+              :placeholder="t('palette.searchPlaceholder')"
               class="flex-1 py-3.5 outline-none bg-transparent text-fg placeholder:text-fg-faint"
             />
             <kbd>ESC</kbd>
@@ -141,11 +143,11 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
               <span :class="i.icon" class="text-base shrink-0" />
               <span class="shrink-0">{{ i.title }}</span>
               <span v-if="i.hint" class="hint text-xs text-fg-faint truncate flex-1">{{ i.hint }}</span>
-              <span v-if="i.kind === 'note'" class="kind-badge shrink-0">笔记</span>
+              <span v-if="i.kind === 'note'" class="kind-badge shrink-0">{{ t('palette.noteKind') }}</span>
               <span v-if="idx === activeIdx" class="ml-auto text-xs text-fg-faint shrink-0">↵</span>
             </li>
             <li v-if="items.length === 0" class="px-3 py-6 text-center text-sm text-fg-faint">
-              没有匹配的结果
+              {{ t('palette.noResult') }}
             </li>
           </ul>
         </div>

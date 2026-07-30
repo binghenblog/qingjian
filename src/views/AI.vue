@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { ref, nextTick, computed, watch, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/settings'
 import { createProvider, type ChatMessage, type AIConfig } from '@/services/ai'
 
 const settings = useSettingsStore()
+const { t } = useI18n()
 
 interface Bubble {
   role: 'user' | 'assistant'
@@ -48,7 +50,7 @@ function clearHistory() {
 }
 
 const channelLabel = computed(() => {
-  const type = settings.aiProvider === 'cloud' ? '云端' : '本地 Ollama'
+  const type = settings.aiProvider === 'cloud' ? t('ai.channelCloud') : t('ai.channelLocal')
   return `${type} · ${settings.aiModel}`
 })
 
@@ -88,7 +90,7 @@ async function send() {
 
   const assistant: Bubble = { role: 'assistant', content: '' }
   bubbles.value.push(assistant)
-  srStatus.value = '正在生成回复…'
+  srStatus.value = t('ai.generating')
 
   const messages: ChatMessage[] = bubbles.value
     .filter((b) => b !== assistant && b.content)
@@ -101,15 +103,15 @@ async function send() {
       assistant.content += token
       await scrollBottom()
     }
-    if (!assistant.content) assistant.content = '（模型未返回内容）'
+    if (!assistant.content) assistant.content = t('ai.emptyModelResponse')
   } catch (e: unknown) {
     if (e instanceof DOMException && e.name === 'AbortError') {
-      if (!assistant.content) assistant.content = '（已停止）'
-      srStatus.value = '已停止生成'
+      if (!assistant.content) assistant.content = t('ai.stopped')
+      srStatus.value = t('ai.stoppedStatus')
     } else {
-      const msg = e instanceof Error ? e.message : '请求失败'
-      assistant.content = `⚠️ ${msg}\n\n如为云端通道，纯 Web 端可能受 CORS 限制；桌面版会经本地后端中转解决此问题。`
-      srStatus.value = 'AI 回复出错'
+      const msg = e instanceof Error ? e.message : t('ai.errorFallback')
+      assistant.content = t('ai.errorBody', { msg })
+      srStatus.value = t('ai.errorStatus')
     }
   } finally {
     controller = null
@@ -126,15 +128,15 @@ async function send() {
     <!-- 通道状态条 -->
     <div class="flex items-center gap-2 mb-3 text-xs text-fg-faint">
       <span class="w-1.5 h-1.5 rounded-full" :class="settings.aiProvider === 'cloud' ? 'bg-sky-500' : 'bg-brand'" />
-      <span>当前通道：{{ channelLabel }}</span>
+      <span>{{ t('ai.channelPrefix') }}{{ channelLabel }}</span>
       <button
         v-if="bubbles.length"
         @click="clearHistory"
         class="ml-auto bg-transparent border-none text-fg-faint hover:text-red-500 cursor-pointer text-xs p-0"
-        title="清空当前对话"
-        aria-label="清空当前对话"
-      >清空对话</button>
-      <RouterLink to="/settings" class="text-brand-strong hover:underline" :class="{ 'ml-auto': !bubbles.length }">去设置切换</RouterLink>
+        :title="t('ai.clearChat')"
+        :aria-label="t('ai.clearChat')"
+      >{{ t('ai.clearChat') }}</button>
+      <RouterLink to="/settings" class="text-brand-strong hover:underline" :class="{ 'ml-auto': !bubbles.length }">{{ t('ai.goToSettings') }}</RouterLink>
     </div>
 
     <!-- 对话区 -->
@@ -145,11 +147,8 @@ async function send() {
           <span class="ai-orb inline-grid place-items-center w-14 h-14 rounded-2xl mb-3">
             <span class="i-carbon-ai-status text-2xl text-white" />
           </span>
-          <h3 class="font-semibold m-0 mb-1">AI 助手</h3>
-          <p class="text-sm text-fg-faint m-0 max-w-xs leading-relaxed">
-            支持本地 Ollama 与云端 OpenAI 兼容双通道，流式输出。<br />
-            默认走本地通道，请先安装并启动 Ollama。
-          </p>
+          <h3 class="font-semibold m-0 mb-1">{{ t('ai.title') }}</h3>
+          <p class="text-sm text-fg-faint m-0 max-w-xs leading-relaxed" v-html="t('ai.emptyHint')" />
         </div>
       </div>
 
@@ -177,7 +176,7 @@ async function send() {
       <textarea
         v-model="input"
         @keydown.enter.exact.prevent="send"
-        :placeholder="needsKey ? '云端通道需要先在设置填写 API Key' : '说点什么…（Enter 发送，Shift+Enter 换行）'"
+        :placeholder="needsKey ? t('ai.placeholderNeedsKey') : t('ai.placeholder')"
         rows="1"
         class="flex-1 px-3 py-2 bg-transparent border-none outline-none text-sm text-fg placeholder:text-fg-faint resize-none max-h-32 leading-relaxed"
       />
@@ -186,8 +185,8 @@ async function send() {
         v-if="loading"
         @click="stop"
         class="stop-btn w-9 h-9 grid place-items-center rounded-xl shrink-0 cursor-pointer"
-        title="停止生成"
-        aria-label="停止生成"
+        :title="t('ai.stop')"
+        :aria-label="t('ai.stop')"
       >
         <span class="i-carbon-stop-filled text-base" />
       </button>
@@ -196,7 +195,7 @@ async function send() {
         @click="send"
         :disabled="!input.trim() || needsKey"
         class="btn-primary w-9 h-9 grid place-items-center rounded-xl shrink-0"
-        aria-label="发送消息"
+        :aria-label="t('ai.send')"
       >
         <span class="i-carbon-send-alt text-base" />
       </button>

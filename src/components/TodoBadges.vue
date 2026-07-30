@@ -1,18 +1,21 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import type { TodoPriority } from '@/types'
 
 defineProps<{ priority: TodoPriority; tag?: string }>()
 
+const { t } = useI18n()
+
 const priorityMeta: Record<TodoPriority, { label: string; cls: string }> = {
-  high: { label: '高', cls: 'p-high' },
-  medium: { label: '中', cls: 'p-medium' },
-  low: { label: '低', cls: 'p-low' }
+  high: { label: 'todos.priorityHigh', cls: 'p-high' },
+  medium: { label: 'todos.priorityMedium', cls: 'p-medium' },
+  low: { label: 'todos.priorityLow', cls: 'p-low' }
 }
 </script>
 
 <template>
   <span class="flex items-center gap-1.5 shrink-0">
-    <span class="badge" :class="priorityMeta[priority].cls">{{ priorityMeta[priority].label }}</span>
+    <span class="badge" :class="priorityMeta[priority].cls">{{ t(priorityMeta[priority].label) }}</span>
     <span v-if="tag" class="badge badge-tag">
       <span class="i-carbon-tag text-[10px]" />
       {{ tag }}

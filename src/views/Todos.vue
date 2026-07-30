@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useTodoStore, PRESET_CATEGORIES } from '@/stores/todos'
 import TodoBadges from '@/components/TodoBadges.vue'
 import type { TodoPriority } from '@/types'
 import { DAILY_CATEGORY } from '@/types'
 
 const store = useTodoStore()
+const { t } = useI18n()
 
 /** 当前分类：默认「每日」 */
 const activeCat = ref(DAILY_CATEGORY)
@@ -20,9 +22,9 @@ const newCatName = ref('')
 const catError = ref('')
 
 const priorities: { value: TodoPriority; label: string; dot: string }[] = [
-  { value: 'high', label: '高', dot: 'bg-red-500' },
-  { value: 'medium', label: '中', dot: 'bg-amber-500' },
-  { value: 'low', label: '低', dot: 'bg-slate-400' }
+  { value: 'high', label: 'todos.priorityHigh', dot: 'bg-red-500' },
+  { value: 'medium', label: 'todos.priorityMedium', dot: 'bg-amber-500' },
+  { value: 'low', label: 'todos.priorityLow', dot: 'bg-slate-400' }
 ]
 
 const catIcons: Record<string, string> = {
@@ -59,7 +61,7 @@ function confirmAddCat() {
     addingCat.value = false
     catError.value = ''
   } else {
-    catError.value = store.categories.includes(n) ? '分类已存在' : '名称需在 1-8 个字符'
+    catError.value = store.categories.includes(n) ? t('todos.catExists') : t('todos.catNameHint')
   }
 }
 
@@ -77,9 +79,9 @@ function isPreset(cat: string) {
 <template>
   <div class="space-y-5 max-w-2xl">
       <div class="flex items-baseline justify-between">
-      <h2 class="text-xl font-bold m-0">待办 / 任务</h2>
+      <h2 class="text-xl font-bold m-0">{{ t('todos.title') }}</h2>
       <span v-if="progress.total" class="text-sm text-fg-faint" aria-live="polite">
-        {{ progress.done }} / {{ progress.total }} 已完成
+        {{ t('todos.doneOf', { done: progress.done, total: progress.total }) }}
       </span>
     </div>
 
@@ -105,8 +107,8 @@ function isPreset(cat: string) {
           role="button"
           tabindex="0"
           class="i-carbon-close text-xs opacity-0 group-hover/tab:opacity-60 hover:!opacity-100"
-          title="删除分类"
-          aria-label="删除分类"
+          :title="t('todos.deleteCategory')"
+          :aria-label="t('todos.deleteCategory')"
         />
       </button>
 
@@ -118,10 +120,10 @@ function isPreset(cat: string) {
           @keyup.esc="addingCat = false; catError = ''"
           v-focus
           maxlength="8"
-          placeholder="分类名"
+          :placeholder="t('todos.catNamePlaceholder')"
           class="input-modern w-28 px-3 py-1.5 text-sm"
         />
-        <button @click="confirmAddCat" class="btn-primary px-3 py-1.5 text-xs">确定</button>
+        <button @click="confirmAddCat" class="btn-primary px-3 py-1.5 text-xs">{{ t('todos.confirm') }}</button>
         <span v-if="catError" class="text-xs text-red-500">{{ catError }}</span>
       </div>
       <button
@@ -130,7 +132,7 @@ function isPreset(cat: string) {
         class="cat-tab cat-add flex items-center gap-1 px-3 py-2 rounded-xl text-sm cursor-pointer"
       >
         <span class="i-carbon-add text-base" />
-        自定义
+        {{ t('todos.custom') }}
       </button>
     </div>
 
@@ -141,17 +143,17 @@ function isPreset(cat: string) {
         class="missed-banner flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm"
       >
         <span class="i-carbon-warning-alt text-lg shrink-0" />
-        <span>昨日有 <b class="missed-num">{{ store.yesterdayMissed }}</b> 项每日任务未完成，今天补上节奏 💪</span>
+        <span>{{ t('todos.missedBanner', { n: store.yesterdayMissed }) }}</span>
       </div>
       <div v-else-if="progress.total" class="clear-banner flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm">
         <span class="i-carbon-checkmark-outline text-lg shrink-0" />
-        <span>昨日全部完成，状态在线 ✨</span>
+        <span>{{ t('todos.clearBanner') }}</span>
       </div>
 
       <!-- 今日进度条 -->
       <div v-if="progress.total" class="progress-card rounded-xl px-4 py-3">
         <div class="flex items-center justify-between text-xs mb-2">
-          <span class="text-fg-soft font-medium">今日进度</span>
+          <span class="text-fg-soft font-medium">{{ t('todos.todayProgress') }}</span>
           <span class="text-fg-faint">{{ progress.done }}/{{ progress.total }} · {{ progress.rate }}%</span>
         </div>
         <div class="track h-2 rounded-full overflow-hidden">
@@ -167,7 +169,7 @@ function isPreset(cat: string) {
     <!-- 非每日分类：简洁进度条 -->
     <div v-else-if="progress.total" class="progress-card rounded-xl px-4 py-3">
       <div class="flex items-center justify-between text-xs mb-2">
-        <span class="text-fg-soft font-medium">「{{ activeCat }}」完成进度</span>
+        <span class="text-fg-soft font-medium">{{ t('todos.catProgress', { cat: activeCat }) }}</span>
         <span class="text-fg-faint">{{ progress.done }}/{{ progress.total }} · {{ progress.rate }}%</span>
       </div>
       <div class="track h-2 rounded-full overflow-hidden">
@@ -185,17 +187,17 @@ function isPreset(cat: string) {
         <input
           v-model="draft"
           @keyup.enter="add"
-          :placeholder="isDaily ? '添加每日任务（每天自动重置），回车确认…' : `添加到「${activeCat}」，回车确认…`"
+          :placeholder="isDaily ? t('todos.addDailyPlaceholder') : t('todos.addCatPlaceholder', { cat: activeCat })"
           class="input-modern flex-1 px-4 py-2.5 text-sm"
         />
         <button @click="add" class="btn-primary px-5 py-2.5 text-sm flex items-center gap-1.5">
           <span class="i-carbon-add text-base" />
-          添加
+          {{ t('todos.add') }}
         </button>
       </div>
       <div class="flex items-center gap-4 flex-wrap">
-        <div class="flex items-center gap-1.5" role="radiogroup" aria-label="优先级">
-          <span class="text-xs text-fg-faint">优先级</span>
+          <div class="flex items-center gap-1.5" role="radiogroup" :aria-label="t('todos.priorityAria')">
+          <span class="text-xs text-fg-faint">{{ t('todos.priorityLabel') }}</span>
           <button
             v-for="p in priorities"
             :key="p.value"
@@ -206,7 +208,7 @@ function isPreset(cat: string) {
             :class="draftPriority === p.value ? 'pri-active' : ''"
           >
             <span class="w-1.5 h-1.5 rounded-full inline-block" :class="p.dot" />
-            {{ p.label }}
+            {{ t(p.label) }}
           </button>
         </div>
         <div class="flex items-center gap-1.5 flex-1 min-w-40">
@@ -215,7 +217,7 @@ function isPreset(cat: string) {
             v-model="draftTag"
             @keyup.enter="add"
             list="used-tags"
-            placeholder="标签（可选），如：阅读 / 健身"
+            :placeholder="t('todos.tagPlaceholder')"
             class="flex-1 text-xs bg-transparent border-none outline-none text-fg placeholder:text-fg-faint py-1"
           />
           <datalist id="used-tags">
@@ -228,33 +230,33 @@ function isPreset(cat: string) {
     <!-- 列表 -->
     <TransitionGroup name="list" tag="ul" class="space-y-2 p-0 m-0 list-none">
       <li
-        v-for="t in list"
-        :key="t.id"
+        v-for="todo in list"
+        :key="todo.id"
         class="todo-item group flex items-center gap-3 px-4 py-3 rounded-xl"
       >
         <button
-          @click="store.toggle(t.id)"
+          @click="store.toggle(todo.id)"
           role="checkbox"
-          :aria-checked="store.isDone(t) ? 'true' : 'false'"
-          :aria-label="`完成任务 ${t.title}`"
+          :aria-checked="store.isDone(todo) ? 'true' : 'false'"
+          :aria-label="t('todos.completeTask', { title: todo.title })"
           class="check w-5 h-5 rounded-full flex items-center justify-center shrink-0 cursor-pointer"
-          :class="store.isDone(t) ? 'check-done' : ''"
+          :class="store.isDone(todo) ? 'check-done' : ''"
         >
-          <span v-if="store.isDone(t)" class="i-carbon-checkmark text-[13px] leading-none text-white" />
+          <span v-if="store.isDone(todo)" class="i-carbon-checkmark text-[13px] leading-none text-white" />
         </button>
-        <span class="flex-1 text-sm transition-colors" :class="store.isDone(t) ? 'line-through text-fg-faint' : ''">
-          {{ t.title }}
+        <span class="flex-1 text-sm transition-colors"           :class="store.isDone(todo) ? 'line-through text-fg-faint' : ''">
+          {{ todo.title }}
         </span>
         <!-- 每日任务连续打卡 -->
-        <span v-if="isDaily && (store.streaks[t.id] ?? 0) > 1" class="streak flex items-center gap-0.5 text-[11px] shrink-0">
+        <span v-if="isDaily && (store.streaks[todo.id] ?? 0) > 1" class="streak flex items-center gap-0.5 text-[11px] shrink-0">
           <span class="i-carbon-fire text-xs" />
-          {{ store.streaks[t.id] }}天
+          {{ t('todos.streakDays', { n: store.streaks[todo.id] }) }}
         </span>
-        <TodoBadges :priority="t.priority" :tag="t.tag" />
+        <TodoBadges :priority="todo.priority" :tag="todo.tag" />
         <button
-          @click="store.remove(t.id)"
+          @click="store.remove(todo.id)"
           class="del opacity-0 group-hover:opacity-100 text-fg-faint hover:text-red-500 cursor-pointer bg-transparent border-none p-1"
-          aria-label="删除任务"
+          :aria-label="t('todos.deleteTask')"
         >
           <span class="i-carbon-trash-can text-base" />
         </button>
@@ -266,14 +268,14 @@ function isPreset(cat: string) {
       <div>
         <span :class="catIcon(activeCat)" class="text-4xl text-fg-faint" />
         <p class="text-sm text-fg-faint mt-2 mb-0">
-          {{ isDaily ? '还没有每日任务，添加打卡习惯吧（如：晨读 30 分钟）' : `「${activeCat}」还没有任务，从上面添加第一项` }}
+          {{ isDaily ? t('todos.emptyDaily') : t('todos.emptyCat', { cat: activeCat }) }}
         </p>
       </div>
     </div>
 
     <p v-if="isDaily" class="text-xs text-fg-faint">
       <span class="i-carbon-information align-text-bottom" />
-      每日任务每天 0 点自动重置，完成记录会保留用于打卡统计
+      {{ t('todos.dailyHint') }}
     </p>
   </div>
 </template>
