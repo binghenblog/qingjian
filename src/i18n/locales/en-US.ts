@@ -159,6 +159,7 @@ export default {
   },
   ai: {
     title: 'AI Assistant',
+    discussNote: 'Discuss with AI',
     channelPrefix: 'Channel: ',
     clearChat: 'Clear chat',
     goToSettings: 'Go to settings to switch',
@@ -183,7 +184,22 @@ export default {
     emptyModelResponse: '(model returned nothing)',
     errorStatus: 'AI reply error',
     errorFallback: 'Request failed',
-    errorBody: '⚠️ {msg}\n\nIf using the cloud channel, a pure web client may hit CORS limits; the desktop build routes through a local backend to resolve this.'
+    errorBody: '⚠️ {msg}\n\nIf using the cloud channel, a pure web client may hit CORS limits; the desktop build routes through a local backend to resolve this.',
+    cmd: {
+      actionKind: 'AI',
+      summarizeWeek: "Summarize this week's notes",
+      summarizeWeekTitle: "This Week's Notes Summary",
+      summarizeWeekInstr: 'Summarize the notes above in bullet points, extracting key information and actionable items.',
+      planTodos: 'Turn my todos into a plan',
+      planTodosTitle: 'Todo Plan',
+      planTodosInstr: 'Based on the todo list above, help me make a reasonable execution plan (by priority and schedule).',
+      notesPreamble: "You are a local personal assistant. The following are some of the user's notes; answer based on this content.",
+      todosPreamble: "You are a local personal assistant. The following is the user's todo list; answer based on it.",
+      notePreamble: "You are a local personal assistant. The following is one of the user's notes; answer based on it.",
+      discussNoteInstr: 'Read this note, point out its core ideas and possible extensions, or help me discuss around it.',
+      noNotesThisWeek: 'No notes updated this week',
+      noPendingTodos: 'No pending todos'
+    }
   },
   palette: {
     title: 'Command palette',

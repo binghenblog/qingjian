@@ -40,4 +40,6 @@ export interface ChatSession {
   createdAt: number
   updatedAt: number
   messages: { role: 'user' | 'assistant'; content: string }[]
+  /** 注入给模型的本地数据上下文（作为 system 消息，不渲染为气泡，不持久化进可见历史） */
+  context?: string
 }

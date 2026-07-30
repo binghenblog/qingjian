@@ -16,11 +16,16 @@ if (import.meta.hot) {
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { useNoteStore } from '@/stores/notes'
+import { useAiStore } from '@/stores/ai'
 import { useConfirm } from '@/composables/useConfirm'
 import { md } from '@/services/markdown'
+import { formatNotes } from '@/services/aiContext'
 
 const store = useNoteStore()
+const ai = useAiStore()
+const router = useRouter()
 const { t } = useI18n()
 const { confirm } = useConfirm()
 
@@ -198,6 +203,20 @@ async function del() {
 function onMoveFolder(e: Event) {
   const v = (e.target as HTMLSelectElement).value
   if (store.current) store.moveToFolder(store.current.id, v)
+}
+
+/** 用 AI 讨论当前笔记：把笔记内容作为上下文发起一次 AI 对话 */
+async function discussWithAI() {
+  const n = store.current
+  if (!n) return
+  const body = formatNotes([n])
+  if (!body) return
+  router.push('/ai')
+  await ai.askWithContext({
+    instruction: t('ai.cmd.discussNoteInstr'),
+    context: `${t('ai.cmd.notePreamble')}\n\n${body}`,
+    sessionTitle: n.title || t('notes.untitled')
+  })
 }
 
 /**
@@ -414,6 +433,14 @@ onMounted(() => {
             </button>
           </div>
           <button
+            @click="discussWithAI"
+            class="ai-btn w-8 h-8 rounded-lg grid place-items-center text-fg-faint hover:text-brand cursor-pointer shrink-0"
+            :title="t('ai.discussNote')"
+            :aria-label="t('ai.discussNote')"
+          >
+            <span class="i-carbon-ai-status text-base" />
+          </button>
+          <button
             @click="del"
             class="del-btn w-8 h-8 rounded-lg grid place-items-center text-fg-faint hover:text-red-500 cursor-pointer shrink-0"
             :title="t('notes.deleteNote')"
@@ -606,6 +633,9 @@ onMounted(() => {
 
 .del-btn { background: transparent; border: none; transition: color 0.15s ease, background-color 0.15s ease; }
 .del-btn:hover { background: #ef44441a; }
+
+.ai-btn { background: transparent; border: none; transition: color 0.15s ease, background-color 0.15s ease; }
+.ai-btn:hover { background: var(--c-brand-soft); }
 
 .tag-chip {
   display: inline-flex;

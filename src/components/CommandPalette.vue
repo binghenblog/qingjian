@@ -3,18 +3,27 @@ import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useNoteStore } from '@/stores/notes'
+import { useTodoStore } from '@/stores/todos'
+import { useAiStore } from '@/stores/ai'
+import { useToast } from '@/composables/useToast'
+import { formatNotes, formatTodos } from '@/services/aiContext'
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ 'update:open': [boolean] }>()
 
 const router = useRouter()
 const noteStore = useNoteStore()
+const todoStore = useTodoStore()
+const ai = useAiStore()
+const toast = useToast()
 const { t } = useI18n()
 const q = ref('')
 const inputEl = ref<HTMLInputElement>()
 const activeIdx = ref(0)
 /** 打开前聚焦的元素，关闭后恢复（审查 H-10 焦点陷阱） */
 const prevFocus = ref<HTMLElement | null>(null)
+
+const WEEK = 7 * 24 * 60 * 60 * 1000
 
 const pages = [
   { key: 'nav.dashboard', to: '/', icon: 'i-carbon-dashboard' },
@@ -25,21 +34,40 @@ const pages = [
 ]
 
 interface PaletteItem {
-  kind: 'page' | 'note'
+  kind: 'page' | 'note' | 'action'
   title: string
   icon: string
-  /** page: 路由；note: 笔记 id */
-  target: string
+  /** page: 路由；note: 笔记 id；action: 忽略 */
+  target?: string
+  /** action 类型项：点击执行的回调 */
+  action?: () => void
   hint?: string
 }
 
-/** 页面项 + 笔记全文搜索结果（最多 8 条） */
+/** AI 动作：基于本地数据发起对话 */
+const aiActions: PaletteItem[] = [
+  {
+    kind: 'action',
+    title: t('ai.cmd.summarizeWeek'),
+    icon: 'i-carbon-book',
+    action: () => void summarizeWeek()
+  },
+  {
+    kind: 'action',
+    title: t('ai.cmd.planTodos'),
+    icon: 'i-carbon-chat',
+    action: () => void planTodos()
+  }
+]
+
+/** 页面项 + 笔记全文搜索结果（最多 8 条） + AI 动作 */
 const items = computed<PaletteItem[]>(() => {
   const query = q.value.trim()
   const pageItems: PaletteItem[] = pages
     .filter((p) => !query || t(p.key).includes(query))
     .map((p) => ({ kind: 'page', title: t(p.key), icon: p.icon, target: p.to }))
-  if (!query) return pageItems
+  const actionItems = aiActions.filter((a) => !query || a.title.includes(query))
+  if (!query) return [...actionItems, ...pageItems]
   const noteItems: PaletteItem[] = noteStore.searchNotes(query, 8).map((r) => ({
     kind: 'note',
     title: r.note.title || t('notes.untitled'),
@@ -49,6 +77,45 @@ const items = computed<PaletteItem[]>(() => {
   }))
   return [...pageItems, ...noteItems]
 })
+
+/** 总结本周（最近 7 天更新）的笔记 */
+async function summarizeWeek() {
+  const cutoff = Date.now() - WEEK
+  const weekNotes = noteStore.notes
+    .filter((n) => n.updatedAt >= cutoff)
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+  const body = formatNotes(weekNotes)
+  if (!body) {
+    toast.info(t('ai.cmd.noNotesThisWeek'))
+    emit('update:open', false)
+    return
+  }
+  router.push('/ai')
+  emit('update:open', false)
+  await ai.askWithContext({
+    instruction: t('ai.cmd.summarizeWeekInstr'),
+    context: `${t('ai.cmd.notesPreamble')}\n\n${body}`,
+    sessionTitle: t('ai.cmd.summarizeWeekTitle')
+  })
+}
+
+/** 把未完成（且非周期今日已完成）的待办整理成计划 */
+async function planTodos() {
+  const pending = todoStore.todos.filter((t) => !t.done && !(t.doneDates && t.doneDates.length > 0))
+  const body = formatTodos(pending)
+  if (!body) {
+    toast.info(t('ai.cmd.noPendingTodos'))
+    emit('update:open', false)
+    return
+  }
+  router.push('/ai')
+  emit('update:open', false)
+  await ai.askWithContext({
+    instruction: t('ai.cmd.planTodosInstr'),
+    context: `${t('ai.cmd.todosPreamble')}\n\n${body}`,
+    sessionTitle: t('ai.cmd.planTodosTitle')
+  })
+}
 
 watch(q, () => (activeIdx.value = 0))
 
@@ -71,10 +138,14 @@ watch(
 )
 
 function go(item: PaletteItem) {
+  if (item.kind === 'action' && item.action) {
+    item.action()
+    return
+  }
   if (item.kind === 'page') {
-    router.push(item.target)
+    router.push(item.target as string)
   } else {
-    noteStore.select(item.target)
+    noteStore.select(item.target as string)
     router.push('/notes')
   }
   emit('update:open', false)
@@ -156,6 +227,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
               <span class="shrink-0">{{ i.title }}</span>
               <span v-if="i.hint" class="hint text-xs text-fg-faint truncate flex-1">{{ i.hint }}</span>
               <span v-if="i.kind === 'note'" class="kind-badge shrink-0">{{ t('palette.noteKind') }}</span>
+              <span v-if="i.kind === 'action'" class="kind-badge shrink-0">{{ t('ai.cmd.actionKind') }}</span>
               <span v-if="idx === activeIdx" class="ml-auto text-xs text-fg-faint shrink-0">↵</span>
             </li>
             <li v-if="items.length === 0" class="px-3 py-6 text-center text-sm text-fg-faint">

@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { ref, nextTick, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, nextTick, computed, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/settings'
 import { useAiStore } from '@/stores/ai'
-import { createProvider, type ChatMessage, type AIConfig } from '@/services/ai'
 import { useConfirm } from '@/composables/useConfirm'
 import type { ChatSession } from '@/types'
 
@@ -13,17 +12,14 @@ const { t } = useI18n()
 const { confirm } = useConfirm()
 
 const input = ref('')
-const loading = ref(false)
 const scrollEl = ref<HTMLElement>()
-/** 屏幕阅读器状态播报（审查 C-6）：流式生成/停止/出错时通知 */
-const srStatus = ref('')
 /** 移动端会话抽屉显隐 */
 const showSessions = ref(false)
 /** 内联重命名状态 */
 const editingId = ref<string | null>(null)
 const editingTitle = ref('')
 
-/** 当前会话消息（替代旧的单会话 sessionStorage 逻辑） */
+/** 当前会话消息 */
 const messages = computed(() => ai.current?.messages ?? [])
 
 const channelLabel = computed(() => {
@@ -33,71 +29,17 @@ const channelLabel = computed(() => {
 
 const needsKey = computed(() => settings.aiProvider === 'cloud' && !settings.aiApiKey.trim())
 
-function buildConfig(): AIConfig {
-  return {
-    type: settings.aiProvider,
-    baseUrl: settings.aiBaseUrl,
-    apiKey: settings.aiApiKey,
-    model: settings.aiModel
-  }
-}
-
 async function scrollBottom() {
   await nextTick()
   scrollEl.value?.scrollTo({ top: scrollEl.value.scrollHeight, behavior: 'smooth' })
 }
 
-/** 流式请求中止（审查 M-3） */
-let controller: AbortController | null = null
-
-function stop() {
-  controller?.abort()
-}
-
-onUnmounted(() => controller?.abort())
-
-async function send() {
+/** 提交输入框内容（流式发送已下沉到 store，便于命令面板 / 笔记页复用） */
+function submit() {
   const text = input.value.trim()
-  if (!text || loading.value) return
-  if (needsKey.value) return
-  const session = ai.current
-  if (!session) return
+  if (!text) return
   input.value = ''
-  session.messages.push({ role: 'user', content: text })
-  loading.value = true
-  await scrollBottom()
-
-  const assistant = { role: 'assistant' as const, content: '' }
-  session.messages.push(assistant)
-  srStatus.value = t('ai.generating')
-
-  const chatMessages: ChatMessage[] = session.messages
-    .filter((b) => b !== assistant && b.content)
-    .map((b) => ({ role: b.role, content: b.content }))
-
-  controller = new AbortController()
-  try {
-    const provider = createProvider(buildConfig())
-    for await (const token of provider.chat(chatMessages, controller.signal)) {
-      assistant.content += token
-      await scrollBottom()
-    }
-    if (!assistant.content) assistant.content = t('ai.emptyModelResponse')
-  } catch (e: unknown) {
-    if (e instanceof DOMException && e.name === 'AbortError') {
-      if (!assistant.content) assistant.content = t('ai.stopped')
-      srStatus.value = t('ai.stoppedStatus')
-    } else {
-      const msg = e instanceof Error ? e.message : t('ai.errorFallback')
-      assistant.content = t('ai.errorBody', { msg })
-      srStatus.value = t('ai.errorStatus')
-    }
-  } finally {
-    controller = null
-    loading.value = false
-    ai.scheduleSave()
-    await scrollBottom()
-  }
+  void ai.send(text)
 }
 
 function clearHistory() {
@@ -208,7 +150,7 @@ onMounted(() => {
     <!-- 主对话区 -->
     <div class="flex-1 flex flex-col min-w-0">
       <!-- 屏幕阅读器状态播报（审查 C-6） -->
-      <div class="sr-only" role="status" aria-live="polite">{{ srStatus }}</div>
+      <div class="sr-only" role="status" aria-live="polite">{{ ai.status }}</div>
 
       <!-- 通道状态条 -->
       <div class="flex items-center gap-2 mb-3 text-xs text-fg-faint shrink-0">
@@ -263,15 +205,15 @@ onMounted(() => {
       <div class="composer flex items-end gap-2.5 p-2.5 rounded-2xl shrink-0">
         <textarea
           v-model="input"
-          @keydown.enter.exact.prevent="send"
+          @keydown.enter.exact.prevent="submit"
           :placeholder="needsKey ? t('ai.placeholderNeedsKey') : t('ai.placeholder')"
           rows="1"
           class="flex-1 px-3 py-2 bg-transparent border-none outline-none text-sm text-fg placeholder:text-fg-faint resize-none max-h-32 leading-relaxed"
         />
         <!-- 流式输出中显示停止按钮（M-3） -->
         <button
-          v-if="loading"
-          @click="stop"
+          v-if="ai.isStreaming"
+          @click="ai.stop()"
           class="stop-btn w-9 h-9 grid place-items-center rounded-xl shrink-0 cursor-pointer"
           :title="t('ai.stop')"
           :aria-label="t('ai.stop')"
@@ -280,7 +222,7 @@ onMounted(() => {
         </button>
         <button
           v-else
-          @click="send"
+          @click="submit"
           :disabled="!input.trim() || needsKey"
           class="btn-primary w-9 h-9 grid place-items-center rounded-xl shrink-0"
           :aria-label="t('ai.send')"

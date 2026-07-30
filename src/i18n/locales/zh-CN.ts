@@ -161,6 +161,7 @@ export default {
   },
   ai: {
     title: 'AI 助手',
+    discussNote: '用 AI 讨论',
     channelPrefix: '当前通道：',
     clearChat: '清空对话',
     goToSettings: '去设置切换',
@@ -185,7 +186,22 @@ export default {
     emptyModelResponse: '（模型未返回内容）',
     errorStatus: 'AI 回复出错',
     errorFallback: '请求失败',
-    errorBody: '⚠️ {msg}\n\n如为云端通道，纯 Web 端可能受 CORS 限制；桌面版会经本地后端中转解决此问题。'
+    errorBody: '⚠️ {msg}\n\n如为云端通道，纯 Web 端可能受 CORS 限制；桌面版会经本地后端中转解决此问题。',
+    cmd: {
+      actionKind: 'AI',
+      summarizeWeek: '总结本周笔记',
+      summarizeWeekTitle: '本周笔记总结',
+      summarizeWeekInstr: '请用要点形式总结上述笔记，提炼关键信息和可执行事项。',
+      planTodos: '把待办整理成计划',
+      planTodosTitle: '待办计划',
+      planTodosInstr: '请根据上述待办清单，帮我制定一个合理的执行计划（按优先级与时间安排）。',
+      notesPreamble: '你是一个本地个人助手。以下是用户的一部分笔记内容，请基于这些内容回答。',
+      todosPreamble: '你是一个本地个人助手。以下是用户的待办清单，请基于它回答。',
+      notePreamble: '你是一个本地个人助手。下面是一篇用户笔记，请基于它回答。',
+      discussNoteInstr: '请阅读这篇笔记，指出它的核心观点、可能的补充方向，或帮我围绕它展开讨论。',
+      noNotesThisWeek: '本周没有更新过的笔记',
+      noPendingTodos: '当前没有待办事项'
+    }
   },
   palette: {
     title: '命令面板',
