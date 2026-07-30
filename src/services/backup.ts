@@ -1,5 +1,5 @@
-import { storage, type NoteRecord } from './storage'
-import type { TodoRecord } from '@/types'
+import { storage, chatStorage, type NoteRecord } from './storage'
+import type { TodoRecord, ChatSession } from '@/types'
 import { le } from '@/i18n/errors'
 
 /**
@@ -28,6 +28,8 @@ export interface BackupFile {
   todos: TodoRecord[]
   todoCategories: string[]
   noteFolders: string[]
+  /** AI 会话（多会话，持久化于本地库）；旧版备份可能不含此字段 */
+  chats?: ChatSession[]
   /** 设置（已脱敏，不含 aiApiKey） */
   settings: Record<string, unknown> | null
   theme: string | null
@@ -71,6 +73,7 @@ export async function createBackup(): Promise<BackupFile> {
     todos: readJson<TodoRecord[]>(LS_KEYS.todos, []),
     todoCategories: readJson<string[]>(LS_KEYS.todoCategories, []),
     noteFolders: readJson<string[]>(LS_KEYS.noteFolders, []),
+    chats: await chatStorage.listChats(),
     settings: safeSettings,
     theme: localStorage.getItem(LS_KEYS.theme)
   }
@@ -101,6 +104,8 @@ export function validateBackup(data: unknown): string | null {
   if (b.version > BACKUP_VERSION)
     return le('errors.backupVersionTooNew', { version: b.version, current: BACKUP_VERSION })
   if (!Array.isArray(b.notes) || !Array.isArray(b.todos)) return le('errors.backupIncomplete')
+  // chats 为可选项（旧版备份可能不含），存在则必须合法
+  if (b.chats !== undefined && !Array.isArray(b.chats)) return le('errors.backupIncomplete')
   // 逐元素结构校验（审查 M-19）：缺少 id 会导致 IndexedDB 写入异常
   for (const n of b.notes as unknown[]) {
     if (!n || typeof n !== 'object' || typeof (n as Record<string, unknown>).id !== 'string') {
@@ -159,6 +164,34 @@ export async function importBackup(backup: BackupFile, mode: ImportMode): Promis
       return !old || n.updatedAt >= (old.updatedAt ?? 0)
     })
     await storage.saveNotes(toSave)
+  }
+
+  /* ---------- AI 会话（本地库，独立表） ---------- */
+  const normalizeChat = (c: ChatSession): ChatSession => ({
+    id: String(c.id),
+    title: typeof c.title === 'string' ? c.title : '',
+    createdAt: numTs(c.createdAt),
+    updatedAt: numTs(c.updatedAt),
+    messages: Array.isArray(c.messages)
+      ? c.messages
+          .filter(
+            (m) =>
+              m &&
+              (m.role === 'user' || m.role === 'assistant') &&
+              typeof m.content === 'string'
+          )
+          .map((m) => ({ role: m.role, content: m.content }))
+      : []
+  })
+  const incomingChats = (backup.chats ?? []).map(normalizeChat)
+  if (mode === 'replace') {
+    await chatStorage.replaceAllChats(incomingChats)
+  } else {
+    const existingChats = new Map((await chatStorage.listChats()).map((c) => [c.id, c]))
+    const toSaveChats = incomingChats.filter(
+      (c) => !existingChats.has(c.id) || c.updatedAt >= (existingChats.get(c.id)!.updatedAt ?? 0)
+    )
+    for (const c of toSaveChats) await chatStorage.saveChat(c)
   }
 
   /* ---------- 待办 / 分类 / 文件夹（localStorage） ---------- */

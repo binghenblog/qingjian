@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { storage, isStorageAvailable, type NoteRecord } from '@/services/storage'
 import { le } from '@/i18n/errors'
+import { useToast } from '@/composables/useToast'
 
 /** 入库前转纯对象：剥离 Vue 响应式 Proxy，避免 IndexedDB 结构化克隆失败 */
 function toPlain(n: NoteRecord): NoteRecord {
@@ -30,6 +31,8 @@ export const useNoteStore = defineStore('notes', () => {
   const loaded = ref(false)
   /** 加载失败信息（IndexedDB 不可用等），供 UI 降级提示而非白屏（审查 H-8） */
   const loadError = ref<string | null>(null)
+  /** 全局通知：让原本「静默无反馈」的写盘失败对用户可见（审查 M-46） */
+  const { error: toastError } = useToast()
 
   /** 用户创建的文件夹（有序） */
   const folders = ref<string[]>(loadFolders())
@@ -109,7 +112,9 @@ export const useNoteStore = defineStore('notes', () => {
       affected.forEach((n) => (n.folder = name))
       folders.value = prevFolders
       persistFolders()
-      lastError.value = le('errors.removeFolderFailed', { msg: (e as Error).message })
+      const msg = le('errors.removeFolderFailed', { msg: (e as Error).message })
+      lastError.value = msg
+      toastError(msg)
       throw e
     }
   }
@@ -137,7 +142,9 @@ export const useNoteStore = defineStore('notes', () => {
       return n
     } catch (e) {
       // 写盘失败：不污染内存态，回滚（审查 L-39）
-      lastError.value = le('errors.createNoteFailed', { msg: (e as Error).message })
+      const msg = le('errors.createNoteFailed', { msg: (e as Error).message })
+      lastError.value = msg
+      toastError(msg)
       throw e
     }
   }
@@ -159,7 +166,9 @@ export const useNoteStore = defineStore('notes', () => {
       lastError.value = null
     } catch (e) {
       Object.assign(n, snapshot)
-      lastError.value = le('errors.saveFailed', { msg: (e as Error).message })
+      const msg = le('errors.saveFailed', { msg: (e as Error).message })
+      lastError.value = msg
+      toastError(msg)
       throw e
     }
   }

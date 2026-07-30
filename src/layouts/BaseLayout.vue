@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import CommandPalette from '@/components/CommandPalette.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import ToastHost from '@/components/ToastHost.vue'
 import { useShortcuts } from '@/composables/useShortcuts'
 
 useShortcuts()
@@ -101,6 +102,7 @@ function openPalette() {
 
     <CommandPalette v-model:open="paletteOpen" />
     <ConfirmDialog />
+    <ToastHost />
   </div>
 </template>
 

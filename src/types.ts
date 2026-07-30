@@ -33,3 +33,13 @@ export interface NoteRecord {
   createdAt: number
   updatedAt: number
 }
+
+/** AI 会话：持久化于本地数据库，支持多会话切换与重启保留 */
+export interface ChatSession {
+  id: string
+  /** 展示标题；首条用户消息自动提取，用户可重命名（空串 = 未命名） */
+  title: string
+  createdAt: number
+  updatedAt: number
+  messages: { role: 'user' | 'assistant'; content: string }[]
+}

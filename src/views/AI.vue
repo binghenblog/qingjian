@@ -1,53 +1,30 @@
 <script setup lang="ts">
-import { ref, nextTick, computed, watch, onUnmounted } from 'vue'
+import { ref, nextTick, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/settings'
+import { useAiStore } from '@/stores/ai'
 import { createProvider, type ChatMessage, type AIConfig } from '@/services/ai'
+import { useConfirm } from '@/composables/useConfirm'
+import type { ChatSession } from '@/types'
 
 const settings = useSettingsStore()
+const ai = useAiStore()
 const { t } = useI18n()
-
-interface Bubble {
-  role: 'user' | 'assistant'
-  content: string
-}
-
-/** 会话内历史持久化（审查 M-17）：切页/刷新不丢，关浏览器即清 */
-const HISTORY_KEY = 'qingjian.ai-history'
-
-function loadHistory(): Bubble[] {
-  try {
-    const raw = sessionStorage.getItem(HISTORY_KEY)
-    const list = raw ? JSON.parse(raw) : []
-    return Array.isArray(list) ? list : []
-  } catch {
-    return []
-  }
-}
+const { confirm } = useConfirm()
 
 const input = ref('')
 const loading = ref(false)
-const bubbles = ref<Bubble[]>(loadHistory())
 const scrollEl = ref<HTMLElement>()
 /** 屏幕阅读器状态播报（审查 C-6）：流式生成/停止/出错时通知 */
 const srStatus = ref('')
+/** 移动端会话抽屉显隐 */
+const showSessions = ref(false)
+/** 内联重命名状态 */
+const editingId = ref<string | null>(null)
+const editingTitle = ref('')
 
-watch(
-  bubbles,
-  (v) => {
-    try {
-      sessionStorage.setItem(HISTORY_KEY, JSON.stringify(v))
-    } catch {
-      /* 配额满等异常忽略 */
-    }
-  },
-  { deep: true }
-)
-
-function clearHistory() {
-  bubbles.value = []
-  sessionStorage.removeItem(HISTORY_KEY)
-}
+/** 当前会话消息（替代旧的单会话 sessionStorage 逻辑） */
+const messages = computed(() => ai.current?.messages ?? [])
 
 const channelLabel = computed(() => {
   const type = settings.aiProvider === 'cloud' ? t('ai.channelCloud') : t('ai.channelLocal')
@@ -83,23 +60,25 @@ async function send() {
   const text = input.value.trim()
   if (!text || loading.value) return
   if (needsKey.value) return
+  const session = ai.current
+  if (!session) return
   input.value = ''
-  bubbles.value.push({ role: 'user', content: text })
+  session.messages.push({ role: 'user', content: text })
   loading.value = true
   await scrollBottom()
 
-  const assistant: Bubble = { role: 'assistant', content: '' }
-  bubbles.value.push(assistant)
+  const assistant = { role: 'assistant' as const, content: '' }
+  session.messages.push(assistant)
   srStatus.value = t('ai.generating')
 
-  const messages: ChatMessage[] = bubbles.value
+  const chatMessages: ChatMessage[] = session.messages
     .filter((b) => b !== assistant && b.content)
     .map((b) => ({ role: b.role, content: b.content }))
 
   controller = new AbortController()
   try {
     const provider = createProvider(buildConfig())
-    for await (const token of provider.chat(messages, controller.signal)) {
+    for await (const token of provider.chat(chatMessages, controller.signal)) {
       assistant.content += token
       await scrollBottom()
     }
@@ -116,89 +95,199 @@ async function send() {
   } finally {
     controller = null
     loading.value = false
+    ai.scheduleSave()
     await scrollBottom()
   }
 }
+
+function clearHistory() {
+  const s = ai.current
+  if (!s) return
+  s.messages = []
+}
+
+function openNewSession() {
+  ai.addSession()
+  showSessions.value = false
+  void nextTick(scrollBottom)
+}
+
+async function onDelete(session: ChatSession) {
+  if (
+    !(await confirm({
+      title: t('ai.deleteChatTitle'),
+      message: t('ai.deleteChatMsg', { title: session.title || t('ai.untitledChat') }),
+      confirmText: t('ai.deleteChat'),
+      danger: true
+    }))
+  )
+    return
+  ai.deleteSession(session.id)
+}
+
+function startRename(session: ChatSession) {
+  editingId.value = session.id
+  editingTitle.value = session.title
+}
+
+function commitRename() {
+  if (editingId.value) ai.renameSession(editingId.value, editingTitle.value)
+  editingId.value = null
+}
+
+// 切换会话后滚动到底部
+watch(
+  () => ai.currentId,
+  () => void nextTick(scrollBottom)
+)
+
+onMounted(() => {
+  void ai.load()
+  void nextTick(scrollBottom)
+})
 </script>
 
 <template>
-  <div class="flex flex-col h-full max-w-3xl">
-    <!-- 屏幕阅读器状态播报（审查 C-6） -->
-    <div class="sr-only" role="status" aria-live="polite">{{ srStatus }}</div>
-    <!-- 通道状态条 -->
-    <div class="flex items-center gap-2 mb-3 text-xs text-fg-faint">
-      <span class="w-1.5 h-1.5 rounded-full" :class="settings.aiProvider === 'cloud' ? 'bg-sky-500' : 'bg-brand'" />
-      <span>{{ t('ai.channelPrefix') }}{{ channelLabel }}</span>
-      <button
-        v-if="bubbles.length"
-        @click="clearHistory"
-        class="ml-auto bg-transparent border-none text-fg-faint hover:text-red-500 cursor-pointer text-xs p-0"
-        :title="t('ai.clearChat')"
-        :aria-label="t('ai.clearChat')"
-      >{{ t('ai.clearChat') }}</button>
-      <RouterLink to="/settings" class="text-brand-strong hover:underline" :class="{ 'ml-auto': !bubbles.length }">{{ t('ai.goToSettings') }}</RouterLink>
-    </div>
+  <div class="flex h-full gap-3 min-h-0">
+    <!-- 会话列表：桌面常驻 / 移动端抽屉 -->
+    <aside
+      class="w-56 shrink-0 flex flex-col rounded-2xl bg-surface border border-border overflow-hidden"
+      :class="showSessions ? 'flex' : 'hidden md:flex'"
+    >
+      <div class="flex items-center justify-between px-3 py-2.5 border-b border-border shrink-0">
+        <span class="text-sm font-semibold">{{ t('ai.sessions') }}</span>
+        <button class="icon-btn" @click="openNewSession" :title="t('ai.newChat')" :aria-label="t('ai.newChat')">
+          <span class="i-carbon-add text-base" />
+        </button>
+      </div>
+      <ul class="flex-1 overflow-auto p-1.5 space-y-1">
+        <li v-for="s in ai.sessions" :key="s.id">
+          <div
+            class="group flex items-center gap-1.5 px-2.5 py-2 rounded-xl cursor-pointer text-sm"
+            :class="s.id === ai.currentId ? 'sess-active' : ''"
+            @click="ai.selectSession(s.id); showSessions = false"
+          >
+            <template v-if="editingId === s.id">
+              <input
+                v-model="editingTitle"
+                autofocus
+                @keydown.enter.prevent="commitRename"
+                @keydown.esc.prevent="editingId = null"
+                @blur="commitRename"
+                class="sess-rename flex-1 px-1 py-0.5 text-sm bg-transparent border-none outline-none min-w-0"
+                :aria-label="t('ai.renameChat')"
+              />
+            </template>
+            <template v-else>
+              <span class="sess-title flex-1 truncate" @dblclick="startRename(s)">{{ s.title || t('ai.untitledChat') }}</span>
+              <button
+                class="sess-icon opacity-0 group-hover:opacity-100"
+                @click.stop="startRename(s)"
+                :title="t('ai.renameChat')"
+                :aria-label="t('ai.renameChat')"
+              >
+                <span class="i-carbon-edit text-xs" />
+              </button>
+              <button
+                class="sess-icon opacity-0 group-hover:opacity-100 hover:text-red-500"
+                @click.stop="onDelete(s)"
+                :title="t('ai.deleteChat')"
+                :aria-label="t('ai.deleteChat')"
+              >
+                <span class="i-carbon-trash-can text-xs" />
+              </button>
+            </template>
+          </div>
+        </li>
+        <li v-if="ai.sessions.length === 0" class="text-xs text-fg-faint px-2.5 py-3 text-center">
+          {{ t('ai.noChats') }}
+        </li>
+      </ul>
+    </aside>
 
-    <!-- 对话区（role=log：屏幕阅读器可感知新回复追加，审查 H-12） -->
-    <div ref="scrollEl" class="flex-1 overflow-auto space-y-4 pb-4" role="log" aria-live="polite" aria-label="对话记录">
-      <!-- 空状态 -->
-      <div v-if="bubbles.length === 0" class="grid place-items-center h-full text-center">
-        <div>
-          <span class="ai-orb inline-grid place-items-center w-14 h-14 rounded-2xl mb-3">
-            <span class="i-carbon-ai-status text-2xl text-white" />
-          </span>
-          <h3 class="font-semibold m-0 mb-1">{{ t('ai.title') }}</h3>
-          <p class="text-sm text-fg-faint m-0 max-w-xs leading-relaxed" v-html="t('ai.emptyHint')" />
-        </div>
+    <!-- 主对话区 -->
+    <div class="flex-1 flex flex-col min-w-0">
+      <!-- 屏幕阅读器状态播报（审查 C-6） -->
+      <div class="sr-only" role="status" aria-live="polite">{{ srStatus }}</div>
+
+      <!-- 通道状态条 -->
+      <div class="flex items-center gap-2 mb-3 text-xs text-fg-faint shrink-0">
+        <button class="icon-btn md:hidden" @click="showSessions = !showSessions" :aria-label="t('ai.sessions')">
+          <span class="i-carbon-list" />
+        </button>
+        <span class="w-1.5 h-1.5 rounded-full" :class="settings.aiProvider === 'cloud' ? 'bg-sky-500' : 'bg-brand'" />
+        <span>{{ t('ai.channelPrefix') }}{{ channelLabel }}</span>
+        <button
+          v-if="messages.length"
+          @click="clearHistory"
+          class="ml-auto bg-transparent border-none text-fg-faint hover:text-red-500 cursor-pointer text-xs p-0"
+          :title="t('ai.clearChat')"
+          :aria-label="t('ai.clearChat')"
+        >{{ t('ai.clearChat') }}</button>
+        <RouterLink to="/settings" class="text-brand-strong hover:underline" :class="{ 'ml-auto': !messages.length }">{{ t('ai.goToSettings') }}</RouterLink>
       </div>
 
-      <!-- 气泡 -->
-      <div
-        v-for="(b, i) in bubbles"
-        :key="i"
-        class="flex"
-        :class="b.role === 'user' ? 'justify-end' : 'justify-start'"
-      >
+      <!-- 对话区（role=log：屏幕阅读器可感知新回复追加，审查 H-12） -->
+      <div ref="scrollEl" class="flex-1 overflow-auto space-y-4 pb-4" role="log" aria-live="polite" aria-label="对话记录">
+        <!-- 空状态 -->
+        <div v-if="messages.length === 0" class="grid place-items-center h-full text-center">
+          <div>
+            <span class="ai-orb inline-grid place-items-center w-14 h-14 rounded-2xl mb-3">
+              <span class="i-carbon-ai-status text-2xl text-white" />
+            </span>
+            <h3 class="font-semibold m-0 mb-1">{{ t('ai.title') }}</h3>
+            <p class="text-sm text-fg-faint m-0 max-w-xs leading-relaxed" v-html="t('ai.emptyHint')" />
+          </div>
+        </div>
+
+        <!-- 气泡 -->
         <div
-          class="max-w-[78%] px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words"
-          :class="b.role === 'user' ? 'bubble-user' : 'bubble-ai'"
+          v-for="(b, i) in messages"
+          :key="i"
+          class="flex"
+          :class="b.role === 'user' ? 'justify-end' : 'justify-start'"
         >
-          <template v-if="b.content">{{ b.content }}</template>
-          <span v-else class="dots flex gap-1.5 items-center">
-            <span class="dot" /><span class="dot" style="animation-delay: 0.15s" /><span class="dot" style="animation-delay: 0.3s" />
-          </span>
+          <div
+            class="max-w-[78%] px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words"
+            :class="b.role === 'user' ? 'bubble-user' : 'bubble-ai'"
+          >
+            <template v-if="b.content">{{ b.content }}</template>
+            <span v-else class="dots flex gap-1.5 items-center">
+              <span class="dot" /><span class="dot" style="animation-delay: 0.15s" /><span class="dot" style="animation-delay: 0.3s" />
+            </span>
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- 输入区 -->
-    <div class="composer flex items-end gap-2.5 p-2.5 rounded-2xl shrink-0">
-      <textarea
-        v-model="input"
-        @keydown.enter.exact.prevent="send"
-        :placeholder="needsKey ? t('ai.placeholderNeedsKey') : t('ai.placeholder')"
-        rows="1"
-        class="flex-1 px-3 py-2 bg-transparent border-none outline-none text-sm text-fg placeholder:text-fg-faint resize-none max-h-32 leading-relaxed"
-      />
-      <!-- 流式输出中显示停止按钮（M-3） -->
-      <button
-        v-if="loading"
-        @click="stop"
-        class="stop-btn w-9 h-9 grid place-items-center rounded-xl shrink-0 cursor-pointer"
-        :title="t('ai.stop')"
-        :aria-label="t('ai.stop')"
-      >
-        <span class="i-carbon-stop-filled text-base" />
-      </button>
-      <button
-        v-else
-        @click="send"
-        :disabled="!input.trim() || needsKey"
-        class="btn-primary w-9 h-9 grid place-items-center rounded-xl shrink-0"
-        :aria-label="t('ai.send')"
-      >
-        <span class="i-carbon-send-alt text-base" />
-      </button>
+      <!-- 输入区 -->
+      <div class="composer flex items-end gap-2.5 p-2.5 rounded-2xl shrink-0">
+        <textarea
+          v-model="input"
+          @keydown.enter.exact.prevent="send"
+          :placeholder="needsKey ? t('ai.placeholderNeedsKey') : t('ai.placeholder')"
+          rows="1"
+          class="flex-1 px-3 py-2 bg-transparent border-none outline-none text-sm text-fg placeholder:text-fg-faint resize-none max-h-32 leading-relaxed"
+        />
+        <!-- 流式输出中显示停止按钮（M-3） -->
+        <button
+          v-if="loading"
+          @click="stop"
+          class="stop-btn w-9 h-9 grid place-items-center rounded-xl shrink-0 cursor-pointer"
+          :title="t('ai.stop')"
+          :aria-label="t('ai.stop')"
+        >
+          <span class="i-carbon-stop-filled text-base" />
+        </button>
+        <button
+          v-else
+          @click="send"
+          :disabled="!input.trim() || needsKey"
+          class="btn-primary w-9 h-9 grid place-items-center rounded-xl shrink-0"
+          :aria-label="t('ai.send')"
+        >
+          <span class="i-carbon-send-alt text-base" />
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -237,6 +326,46 @@ async function send() {
   transition: border-color 0.15s ease;
 }
 .stop-btn:hover { border-color: #ef4444; }
+
+.sess-active {
+  background: var(--c-brand-soft);
+  color: var(--c-brand-strong);
+  font-weight: 600;
+}
+.dark .sess-active { color: var(--c-brand); }
+
+.icon-btn {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--c-fg-soft);
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+.icon-btn:hover { color: var(--c-fg); background: var(--c-bg); }
+
+.sess-icon {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--c-fg-faint);
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+.sess-icon:hover { color: var(--c-fg); background: var(--c-bg); }
+
+.sess-rename {
+  color: var(--c-fg);
+  border-bottom: 1px solid var(--c-border);
+}
 
 .dots { min-height: 18px; }
 .dot {
