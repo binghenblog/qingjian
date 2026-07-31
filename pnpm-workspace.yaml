@@ -1,0 +1,12 @@
+# pnpm v11 workspace 配置
+# 注意：pnpm v11 已移除 v10 的 onlyBuiltDependencies，构建脚本审批改用 allowBuilds，
+# 且必须写在 pnpm-workspace.yaml（不读 package.json 的 pnpm 字段，也不读 .npmrc）。
+# CI 使用 pnpm install --frozen-lockfile，会读取此文件来决定是否允许依赖的构建脚本。
+packages:
+  - "."
+
+# 显式放行需要执行 postinstall/build 脚本的依赖，否则 pnpm v11 默认拦截并报
+# [ERR_PNPM_IGNORED_BUILDS] 导致 install 以非零码退出。
+allowBuilds:
+  esbuild: true
+  vue-demi: true

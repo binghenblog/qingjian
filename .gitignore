@@ -41,8 +41,7 @@ qingjian-data/
 *.timestamp-*.mjs
 _tmp_*
 
-# pnpm v11 重建的冗余文件；构建审批已移入 package.json 的 pnpm.onlyBuiltDependencies
-pnpm-workspace.yaml
 
-# pnpm v11 重建的冗余文件；构建审批已移入 package.json 的 pnpm.onlyBuiltDependencies
-pnpm-workspace.yaml
+
+# 注意：pnpm-workspace.yaml 必须入库！pnpm v11 的构建脚本审批(allowBuilds)只能写在此文件，
+# 且必须随仓库提交，否则 CI(pnpm install --frozen-lockfile) 会因 [ERR_PNPM_IGNORED_BUILDS] 失败。
