@@ -27,7 +27,7 @@ export default {
     settings: '设置',
     search: '快速搜索',
     searchAria: '快速搜索（Ctrl/Cmd + K）',
-    collapseAria: '收起 / 展开侧边栏'
+    toggleAria: '打开 / 收起导航菜单'
   },
   dashboard: {
     greetingNight: '夜深了',

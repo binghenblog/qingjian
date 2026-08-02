@@ -25,7 +25,7 @@ export default {
     settings: 'Settings',
     search: 'Quick search',
     searchAria: 'Quick search (Ctrl/Cmd + K)',
-    collapseAria: 'Collapse / expand sidebar'
+    toggleAria: 'Open / close navigation menu'
   },
   dashboard: {
     greetingNight: 'Late night',

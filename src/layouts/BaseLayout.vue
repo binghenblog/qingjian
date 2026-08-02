@@ -18,23 +18,27 @@ const pageTitle = computed(() => {
   return typeof k === 'string' ? t(k) : t('app.name')
 })
 
-// 侧边栏收起状态（持久化到 localStorage，审查 C-7 响应式）
-const NAV_KEY = 'qingjian.navCollapsed'
-const collapsed = ref(false)
+// 抽屉式导航开合状态（持久化到 localStorage）
+const NAV_KEY = 'qingjian.navOpen'
+const open = ref(false)
 try {
-  collapsed.value = localStorage.getItem(NAV_KEY) === '1'
+  open.value = localStorage.getItem(NAV_KEY) === '1'
 } catch {
   /* ignore */
 }
-watch(collapsed, (v) => {
+watch(open, (v) => {
   try {
     localStorage.setItem(NAV_KEY, v ? '1' : '0')
   } catch {
     /* ignore */
   }
 })
-function toggleCollapse() {
-  collapsed.value = !collapsed.value
+function toggle() {
+  open.value = !open.value
+}
+// 路由跳转后自动收起抽屉，避免遮挡内容
+function closeOnNavigate() {
+  open.value = false
 }
 
 // 导航：图标在上、文字在下的圆角卡片（v0.3.0 导航改版）
@@ -55,80 +59,94 @@ function openPalette() {
 </script>
 
 <template>
-  <div class="flex flex-col md:flex-row h-screen bg-bg text-fg">
-    <!-- 侧边栏：桌面纵向 / 移动端横向滚动顶部栏（审查 C-7 响应式） -->
-    <aside
-      class="flex md:flex-col flex-row items-center md:items-stretch gap-2 p-3 border-b md:border-b-0 md:border-r border-border shrink-0 overflow-x-auto md:overflow-visible md:transition-[width] md:duration-200"
-      :class="collapsed ? 'md:w-[78px]' : 'md:w-60'"
+  <div class="relative h-screen bg-bg text-fg overflow-hidden">
+    <!-- 常驻左上角的圆形导航按钮 -->
+    <button
+      class="nav-fab fixed top-4 left-4 z-50 grid place-items-center w-11 h-11 rounded-full text-white"
+      @click="toggle"
+      :aria-label="t('nav.toggleAria')"
+      :aria-expanded="open ? 'true' : 'false'"
+      :title="t('nav.toggleAria')"
     >
-      <!-- 顶部：收起按钮 + Logo -->
-      <div class="flex items-center gap-2 px-1 py-2 md:mb-4 shrink-0 w-full">
-        <button
-          class="collapse-btn grid place-items-center w-9 h-9 rounded-xl text-fg-soft hover:bg-surface-hover shrink-0"
-          @click="toggleCollapse"
-          :aria-label="t('nav.collapseAria')"
-          :title="t('nav.collapseAria')"
-        >
-          <span :class="collapsed ? 'i-carbon-chevron-right' : 'i-carbon-chevron-left'" class="text-lg" />
-        </button>
-        <div class="flex items-center gap-2 min-w-0" :class="collapsed ? 'md:hidden' : ''">
-          <span class="logo-mark w-9 h-9 rounded-xl text-white grid place-items-center text-base font-bold shrink-0">青</span>
-          <div class="leading-tight hidden md:block">
-            <div class="font-bold text-base tracking-wide truncate">{{ t('app.name') }}</div>
-            <div class="text-[11px] text-fg-faint truncate">{{ t('app.tagline') }}</div>
-          </div>
+      <span :class="open ? 'i-carbon-close' : 'i-carbon-menu'" class="text-xl" />
+    </button>
+
+    <!-- 抽屉展开时的背景遮罩（点击收起） -->
+    <transition name="fade">
+      <div
+        v-if="open"
+        class="backdrop fixed inset-0 z-30 bg-black/40"
+        @click="toggle"
+        aria-hidden="true"
+      />
+    </transition>
+
+    <!-- 左侧抽屉式导航（自适应窄宽，小屏限制最大宽度） -->
+    <aside
+      class="drawer fixed top-0 left-0 z-40 h-screen w-[220px] max-w-[78vw] bg-bg border-r border-border
+             flex flex-col gap-2 p-3 pt-16 transition-transform duration-200 ease-out"
+      :class="open ? 'translate-x-0' : '-translate-x-full'"
+      aria-label="main navigation"
+    >
+      <!-- 顶部：Logo（避开左上角 FAB） -->
+      <div class="flex items-center gap-2 px-1 py-2 mb-1 shrink-0">
+        <span class="logo-mark w-8 h-8 rounded-lg text-white grid place-items-center text-base font-bold shrink-0">青</span>
+        <div class="leading-tight">
+          <div class="font-bold text-base tracking-wide truncate">{{ t('app.name') }}</div>
+          <div class="text-[11px] text-fg-faint truncate">{{ t('app.tagline') }}</div>
         </div>
       </div>
 
-      <!-- 导航 -->
-      <nav class="flex md:flex-col flex-row gap-1.5 shrink-0">
+      <!-- 导航卡片（图标在上、文字在下） -->
+      <nav class="flex flex-col gap-1.5 flex-1 overflow-y-auto overflow-x-hidden">
         <RouterLink
           v-for="n in nav"
           :key="n.to"
           :to="n.to"
-          class="nav-card flex md:flex-col flex-row items-center justify-center gap-1 px-3 py-2 rounded-xl text-fg-soft"
+          class="nav-card flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl text-fg-soft"
           active-class="nav-active"
           :aria-label="t(n.key)"
+          @click="closeOnNavigate"
         >
           <span :class="n.icon" class="text-xl shrink-0" />
-          <span class="text-[11px] leading-tight" :class="collapsed ? 'md:hidden' : ''">{{ t(n.key) }}</span>
+          <span class="text-[11px] leading-tight">{{ t(n.key) }}</span>
         </RouterLink>
       </nav>
 
-      <!-- 底部：搜索入口 + 设置 + 版本 -->
-      <div class="mt-auto flex md:flex-col flex-row items-center gap-1.5 md:gap-1.5 shrink-0 md:pt-2">
+      <!-- 底部：搜索 + 设置 + 版本 -->
+      <div class="flex flex-col gap-1.5 shrink-0 pt-2 border-t border-border">
         <button
           class="search-trigger flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-fg-faint cursor-pointer"
           @click="openPalette"
           :aria-label="t('nav.searchAria')"
-          :class="collapsed ? 'md:justify-center' : ''"
         >
           <span class="i-carbon-search text-base shrink-0" />
-          <span :class="collapsed ? 'md:hidden' : ''">{{ t('nav.search') }}</span>
-          <kbd class="hidden md:inline ml-auto" :class="collapsed ? 'md:hidden' : ''">⌘K</kbd>
+          <span>{{ t('nav.search') }}</span>
+          <kbd class="ml-auto">⌘K</kbd>
         </button>
 
         <RouterLink
           to="/settings"
-          class="nav-card flex md:flex-col flex-row items-center justify-center gap-1 px-3 py-2 rounded-xl text-fg-soft"
+          class="nav-card flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl text-fg-soft"
           active-class="nav-active"
           :aria-label="t('nav.settings')"
+          @click="closeOnNavigate"
         >
           <span class="i-carbon-settings text-xl shrink-0" />
-          <span class="text-[11px] leading-tight" :class="collapsed ? 'md:hidden' : ''">{{ t('nav.settings') }}</span>
+          <span class="text-[11px] leading-tight">{{ t('nav.settings') }}</span>
         </RouterLink>
 
-        <div class="hidden md:flex px-3 py-1.5 text-[11px] text-fg-faint items-center gap-1.5" :class="collapsed ? 'md:hidden' : ''">
-          <span class="w-1.5 h-1.5 rounded-full bg-brand inline-block" />
+        <div class="px-3 py-1.5 text-[11px] text-fg-faint flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-brand inline-block shrink-0" />
           {{ t('app.version') }}
         </div>
       </div>
     </aside>
 
-    <!-- 主区 -->
-    <main class="flex-1 overflow-hidden p-4 md:p-5">
+    <!-- 主区（始终全宽，抽屉以遮罩方式覆盖） -->
+    <main class="h-screen overflow-hidden p-4 md:p-5">
       <div class="card h-full flex flex-col overflow-hidden">
-        <header class="h-14 px-4 md:px-6 flex items-center justify-between border-b border-border shrink-0">
+        <header class="h-14 pl-14 pr-4 md:px-6 flex items-center justify-between border-b border-border shrink-0">
           <span class="font-semibold truncate">{{ pageTitle }}</span>
           <span class="text-xs text-fg-faint hidden sm:inline">{{ t('app.footer') }}</span>
         </header>
@@ -145,6 +163,19 @@ function openPalette() {
 </template>
 
 <style scoped>
+.nav-fab {
+  background: var(--c-brand-grad);
+  box-shadow: 0 6px 18px var(--c-brand-soft);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.nav-fab:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px var(--c-brand-soft);
+}
+.dark .nav-fab {
+  color: #0b1020;
+}
+
 .logo-mark {
   background: var(--c-brand-grad);
   box-shadow: 0 4px 12px var(--c-brand-soft);
@@ -158,6 +189,14 @@ function openPalette() {
 .search-trigger:hover {
   border-color: var(--c-brand);
   box-shadow: 0 0 0 3px var(--c-brand-soft);
+}
+.search-trigger kbd {
+  font-family: inherit;
+  background: var(--c-surface-hover);
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  padding: 1px 6px;
+  color: var(--c-fg-faint);
 }
 
 .nav-card {
@@ -180,11 +219,20 @@ function openPalette() {
   top: 50%;
   transform: translateY(-50%);
   width: 3px;
-  height: 18px;
+  height: 20px;
   border-radius: 0 4px 4px 0;
   background: var(--c-brand-grad);
 }
 .dark .nav-active {
   color: var(--c-brand);
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 </style>
