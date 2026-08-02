@@ -172,6 +172,16 @@ const locales = SUPPORTED_LOCALES
       </label>
     </section>
 
+    <!-- 记账显示 -->
+    <section class="setting-card rounded-2xl p-5">
+      <div class="font-semibold text-sm mb-1">{{ t('settings.ledgerSummary') }}</div>
+      <p class="text-xs text-fg-faint mt-0 mb-3">{{ t('settings.ledgerSummaryHint') }}</p>
+      <label class="flex items-center gap-2 text-sm text-fg-soft cursor-pointer select-none">
+        <input v-model="settings.ledgerShowSummary" type="checkbox" class="cursor-pointer" />
+        {{ t('settings.ledgerSummaryToggle') }}
+      </label>
+    </section>
+
     <!-- AI 通道 -->
     <section class="setting-card rounded-2xl p-5 space-y-4">
       <div>
