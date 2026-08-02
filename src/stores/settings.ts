@@ -101,30 +101,36 @@ export const useSettingsStore = defineStore('settings', () => {
 
   // 主设置（不含 Key）：写盘加 200ms 防抖，避免每个 ref 变化都立即同步 localStorage（审查 M-9）
   let settingsTimer: number | undefined
+  function persistNow() {
+    try {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          userName: userName.value,
+          aiProvider: aiProvider.value,
+          aiBaseUrl: aiBaseUrl.value,
+          aiModel: aiModel.value,
+          aiKeyRemember: aiKeyRemember.value,
+          locale: locale.value,
+          ledgerShowSummary: ledgerShowSummary.value
+        })
+      )
+    } catch {
+      /* localStorage 不可用（隐私模式 / 配额满）时静默忽略 */
+    }
+  }
+  /** 立即落盘，绕过 200ms 防抖（备份导出 / 窗口关闭前调用，审查 M-5 / L-40） */
+  function flush() {
+    clearTimeout(settingsTimer)
+    persistNow()
+  }
   watch([userName, aiProvider, aiBaseUrl, aiModel, aiKeyRemember, locale, ledgerShowSummary], () => {
     clearTimeout(settingsTimer)
-    settingsTimer = window.setTimeout(() => {
-      try {
-        localStorage.setItem(
-          STORAGE_KEY,
-          JSON.stringify({
-            userName: userName.value,
-            aiProvider: aiProvider.value,
-            aiBaseUrl: aiBaseUrl.value,
-            aiModel: aiModel.value,
-            aiKeyRemember: aiKeyRemember.value,
-            locale: locale.value,
-            ledgerShowSummary: ledgerShowSummary.value
-          })
-        )
-      } catch {
-        /* localStorage 不可用（隐私模式 / 配额满）时静默忽略 */
-      }
-    }, 200)
+    settingsTimer = window.setTimeout(persistNow, 200)
   })
 
   // Key 单独持久化，跟随「记住」开关迁移存储位置
   watch([aiApiKey, aiKeyRemember], () => persistKey(aiApiKey.value, aiKeyRemember.value))
 
-  return { userName, aiProvider, aiBaseUrl, aiApiKey, aiModel, aiKeyRemember, locale, ledgerShowSummary }
+  return { userName, aiProvider, aiBaseUrl, aiApiKey, aiModel, aiKeyRemember, locale, ledgerShowSummary, flush }
 })

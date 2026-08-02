@@ -174,9 +174,20 @@ export const useNoteStore = defineStore('notes', () => {
   }
 
   async function remove(id: string) {
-    await storage.deleteNote(id)
-    notes.value = notes.value.filter((n) => n.id !== id)
-    if (currentId.value === id) currentId.value = notes.value[0]?.id ?? null
+    const idx = notes.value.findIndex((n) => n.id === id)
+    if (idx === -1) return
+    try {
+      // 先删磁盘，成功后再改内存；磁盘失败则保留内存态并提示，避免「已删」复活（审查 M-1）
+      await storage.deleteNote(id)
+      notes.value.splice(idx, 1)
+      if (currentId.value === id) currentId.value = notes.value[0]?.id ?? null
+      lastError.value = null
+    } catch (e) {
+      const msg = le('errors.deleteNoteFailed', { msg: (e as Error).message })
+      lastError.value = msg
+      toastError(msg)
+      throw e
+    }
   }
 
   /**

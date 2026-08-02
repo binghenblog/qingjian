@@ -354,6 +354,8 @@ export default {
     removeFolderFailed: 'Failed to delete folder: {msg}',
     createNoteFailed: 'Failed to create note: {msg}',
     saveFailed: 'Save failed: {msg}',
+    deleteNoteFailed: 'Failed to delete note: {msg}',
+    aiDeleteFailed: 'Failed to delete conversation: {msg}',
     backupNotJson: 'File content is not a valid JSON object',
     backupNotQingjian: 'Not a QingJian backup file (missing app marker)',
     backupNoVersion: 'Backup file is missing a version number',

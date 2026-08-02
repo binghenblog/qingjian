@@ -357,6 +357,8 @@ export default {
     removeFolderFailed: '删除文件夹失败：{msg}',
     createNoteFailed: '新建笔记失败：{msg}',
     saveFailed: '保存失败：{msg}',
+    deleteNoteFailed: '删除笔记失败：{msg}',
+    aiDeleteFailed: '删除对话失败：{msg}',
     backupNotJson: '文件内容不是有效的 JSON 对象',
     backupNotQingjian: '不是青简的备份文件（缺少 app 标识）',
     backupNoVersion: '备份文件缺少版本号',

@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { chatStorage } from '@/services/storage'
 import { createProvider, type ChatMessage, type AIConfig } from '@/services/ai'
 import { useSettingsStore } from '@/stores/settings'
+import { useToast } from '@/composables/useToast'
 import i18n from '@/i18n'
 import type { ChatSession } from '@/types'
 
@@ -34,6 +35,8 @@ export const useAiStore = defineStore('ai', () => {
   const isStreaming = ref(false)
   /** 屏幕阅读器状态播报（生成中/停止/出错） */
   const status = ref('')
+  /** 全局通知：删除会话失败对用户可见（审查 M-2） */
+  const { error: toastError } = useToast()
   let saveTimer: number | undefined
   let controller: AbortController | null = null
 
@@ -95,8 +98,15 @@ export const useAiStore = defineStore('ai', () => {
   }
 
   async function deleteSession(id: string) {
+    try {
+      // 先删磁盘，成功后再改内存；删除失败则保留内存态并提示，避免「已删」复活（审查 M-2）
+      await chatStorage.deleteChat(id)
+    } catch (e) {
+      const msg = tt('errors.aiDeleteFailed', { msg: (e as Error).message })
+      toastError(msg)
+      throw e
+    }
     sessions.value = sessions.value.filter((s) => s.id !== id)
-    await chatStorage.deleteChat(id).catch(() => {})
     if (currentId.value === id) {
       if (sessions.value.length === 0) addSession()
       else currentId.value = sessions.value[0].id

@@ -381,6 +381,7 @@ export const useTodoStore = defineStore('todos', () => {
     streak,
     streaks,
     reload,
+    flushNow,
     add,
     toggle,
     remove,

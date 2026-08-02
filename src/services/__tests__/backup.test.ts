@@ -102,15 +102,15 @@ describe('importBackup - merge', () => {
     expect(JSON.parse(localStorage.getItem('qingjian.note-folders')!)).toEqual(['甲', '乙'])
   })
 
-  it('待办按 id 去重合并', async () => {
+  it('待办按 id 合并，取时间戳较新者（本地更新则本地胜）', async () => {
     localStorage.setItem(
       'qingjian.todos',
-      JSON.stringify([{ id: 't1', title: '本地', done: false, priority: 'medium', category: '生活', createdAt: 1 }])
+      JSON.stringify([{ id: 't1', title: '本地', done: false, priority: 'medium', category: '生活', createdAt: 10 }])
     )
     await importBackup(
       backup({
         todos: [
-          { id: 't1', title: '重复', done: false, priority: 'medium', category: '生活', createdAt: 1 },
+          { id: 't1', title: '备份旧', done: false, priority: 'medium', category: '生活', createdAt: 5 },
           { id: 't2', title: '新增', done: false, priority: 'low', category: '工作', createdAt: 2 }
         ] as BackupFile['todos']
       }),
@@ -119,6 +119,21 @@ describe('importBackup - merge', () => {
     const merged = JSON.parse(localStorage.getItem('qingjian.todos')!)
     expect(merged).toHaveLength(2)
     expect(merged.find((t: { id: string }) => t.id === 't1').title).toBe('本地')
+  })
+
+  it('待办按 id 合并，备份较新则备份胜（审查 M-3）', async () => {
+    localStorage.setItem(
+      'qingjian.todos',
+      JSON.stringify([{ id: 't1', title: '本地旧', done: false, priority: 'medium', category: '生活', createdAt: 5 }])
+    )
+    await importBackup(
+      backup({
+        todos: [{ id: 't1', title: '备份新', done: false, priority: 'medium', category: '生活', createdAt: 10 }] as BackupFile['todos']
+      }),
+      'merge'
+    )
+    const merged = JSON.parse(localStorage.getItem('qingjian.todos')!)
+    expect(merged.find((t: { id: string }) => t.id === 't1').title).toBe('备份新')
   })
 })
 

@@ -18,6 +18,8 @@ import type {
   Quote
 } from '@/types'
 import { le } from '@/i18n/errors'
+import { useTodoStore } from '@/stores/todos'
+import { useSettingsStore } from '@/stores/settings'
 
 /**
  * 青简全量备份 / 恢复（M4）
@@ -69,6 +71,18 @@ function readJson<T>(key: string, fallback: T): T {
 
 /** 生成备份对象 */
 export async function createBackup(): Promise<BackupFile> {
+  // 导出前先 flush 内存态（绕过 200ms 防抖），避免读到尚未落盘的旧数据（审查 M-5）
+  try {
+    useSettingsStore().flush()
+  } catch {
+    /* ignore */
+  }
+  try {
+    useTodoStore().flushNow()
+  } catch {
+    /* ignore */
+  }
+
   const notes = await storage.listNotes()
   const settings = readJson<Record<string, unknown> | null>(LS_KEYS.settings, null)
   // 脱敏：API Key 不随备份导出（新版设置已不含 Key，此处兜底剥离旧字段）
@@ -183,7 +197,8 @@ export async function importBackup(backup: BackupFile, mode: ImportMode): Promis
   const PRIORITIES = ['high', 'medium', 'low'] as const
   const sanitizeTodo = (t: TodoRecord): TodoRecord => ({
     ...t,
-    id: String(t.id),
+    // 缺 id 生成 uuid，避免 `id:"undefined"` 重复键（审查 M-4）
+    id: typeof t.id === 'string' && t.id.trim() ? t.id : crypto.randomUUID(),
     category: typeof t.category === 'string' && t.category ? t.category : '生活',
     priority: PRIORITIES.includes(t.priority as (typeof PRIORITIES)[number]) ? t.priority : 'medium',
     doneDates: Array.isArray(t.doneDates) ? t.doneDates.filter((d) => typeof d === 'string') : undefined,
@@ -248,10 +263,19 @@ export async function importBackup(backup: BackupFile, mode: ImportMode): Promis
     }
     if (backup.theme) localStorage.setItem(LS_KEYS.theme, backup.theme)
   } else {
+    // merge：按 id 合并，取时间戳较新者（与笔记 merge 对齐，审查 M-3）
     const curTodos = readJson<TodoRecord[]>(LS_KEYS.todos, [])
-    const ids = new Set(curTodos.map((t) => t.id))
-    const merged = [...curTodos, ...backup.todos.filter((t) => !ids.has(t.id)).map(sanitizeTodo)]
-    write(LS_KEYS.todos, merged)
+    const byId = new Map<string, TodoRecord>(curTodos.map((t) => [t.id, t]))
+    const ts = (t: TodoRecord) =>
+      Math.max(
+        numTs(t.createdAt),
+        typeof t.completedAt === 'number' && Number.isFinite(t.completedAt) ? t.completedAt : 0
+      )
+    for (const inc of backup.todos.map(sanitizeTodo)) {
+      const old = byId.get(inc.id)
+      if (!old || ts(inc) >= ts(old)) byId.set(inc.id, inc)
+    }
+    write(LS_KEYS.todos, [...byId.values()])
 
     const mergeList = (key: string, incoming: string[] | undefined) => {
       const cur = readJson<string[]>(key, [])
