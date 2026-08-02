@@ -32,28 +32,50 @@ const state = reactive<ConfirmState>({
   danger: false
 })
 
-let resolver: ((v: boolean) => void) | null = null
+interface PendingConfirm {
+  id: number
+  opts: ConfirmOptions
+  resolve: (v: boolean) => void
+}
+
+/**
+ * 待确认队列（审查 M-12）：避免并发 confirm() 时后者覆盖前者的 resolver，
+ * 导致前一个 Promise 永久悬挂。同一时刻只弹一个，关闭后自动展示下一个。
+ */
+let queue: PendingConfirm[] = []
+let nextId = 0
+
+/** 把队首项渲染进共享状态；队列空则关闭弹窗 */
+function showCurrent() {
+  const cur = queue[0]
+  if (!cur) {
+    state.open = false
+    return
+  }
+  state.open = true
+  state.title = cur.opts.title ?? ''
+  state.message = cur.opts.message
+  state.confirmText = cur.opts.confirmText ?? ''
+  state.cancelText = cur.opts.cancelText ?? ''
+  state.danger = cur.opts.danger ?? false
+}
 
 export function useConfirm() {
   /** 弹出确认框，返回用户选择（true=确认 / false=取消或遮罩点击） */
   function confirm(opts: ConfirmOptions): Promise<boolean> {
-    state.open = true
-    state.title = opts.title ?? ''
-    state.message = opts.message
-    state.confirmText = opts.confirmText ?? ''
-    state.cancelText = opts.cancelText ?? ''
-    state.danger = opts.danger ?? false
     return new Promise<boolean>((resolve) => {
-      resolver = resolve
+      queue.push({ id: nextId++, opts, resolve })
+      if (queue.length === 1) showCurrent()
     })
   }
 
-  /** 以给定结果关闭弹窗并兑现 Promise */
+  /** 以给定结果关闭弹窗并兑现当前 Promise，随后展示下一个待确认项（审查 M-12） */
   function resolve(v: boolean) {
     if (!state.open) return
     state.open = false
-    resolver?.(v)
-    resolver = null
+    const cur = queue.shift()
+    cur?.resolve(v)
+    showCurrent()
   }
 
   return { state, confirm, resolve }
