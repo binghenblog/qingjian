@@ -315,7 +315,23 @@ export default {
     confirmDeleteTitle: '删除纪念日',
     confirmDelete: '确定删除「{name}」吗？'
   },
-  quote: { title: '记好句' },
+  quote: {
+    title: '记好句',
+    add: '添加好句',
+    count: '条',
+    text: '句子',
+    textPlaceholder: '写下一句打动你的话…',
+    category: '分类',
+    categoryPlaceholder: '选填，如 名言/感悟',
+    date: '日期',
+    save: '保存',
+    cancel: '取消',
+    empty: '还没有记录，点击右下角 + 记下第一句',
+    textRequired: '句子不能为空',
+    added: '已保存好句',
+    confirmDeleteTitle: '删除好句',
+    confirmDelete: '确定删除这句记录吗？'
+  },
   schedule: {
     title: '日程',
     agenda: '日程安排',

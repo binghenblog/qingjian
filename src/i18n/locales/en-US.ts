@@ -313,7 +313,23 @@ export default {
     confirmDeleteTitle: 'Delete anniversary',
     confirmDelete: 'Delete "{name}"?'
   },
-  quote: { title: 'Quotes' },
+  quote: {
+    title: 'Quotes',
+    add: 'Add quote',
+    count: '',
+    text: 'Quote',
+    textPlaceholder: 'Write down a line that moved you…',
+    category: 'Category',
+    categoryPlaceholder: 'Optional, e.g. Quote/Thought',
+    date: 'Date',
+    save: 'Save',
+    cancel: 'Cancel',
+    empty: 'Nothing yet. Tap + at bottom right to save your first line.',
+    textRequired: 'Quote cannot be empty',
+    added: 'Quote saved',
+    confirmDeleteTitle: 'Delete quote',
+    confirmDelete: 'Delete this quote?'
+  },
   schedule: {
     title: 'Schedule',
     agenda: 'Agenda',
