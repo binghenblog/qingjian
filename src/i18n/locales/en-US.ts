@@ -10,6 +10,7 @@ export default {
   common: {
     confirm: 'Confirm',
     cancel: 'Cancel',
+    delete: 'Delete',
     undo: 'Undo'
   },
   nav: {
@@ -290,7 +291,28 @@ export default {
     invalidNumber: 'Please enter a valid number',
     saved: 'Saved'
   },
-  anniversary: { title: 'Anniversaries' },
+  anniversary: {
+    title: 'Anniversaries',
+    add: 'Add anniversary',
+    count: '',
+    name: 'Name',
+    namePlaceholder: 'Anniversary name',
+    note: 'Note',
+    notePlaceholder: 'Optional',
+    date: 'Date',
+    month: 'Mo',
+    save: 'Save',
+    cancel: 'Cancel',
+    empty: 'No anniversaries yet. Tap + at bottom right to add one.',
+    today: 'Today',
+    tomorrow: 'Tomorrow',
+    daysLeft: '{n} days left',
+    nameRequired: 'Name is required',
+    dateRequired: 'Please pick a date',
+    added: 'Anniversary added',
+    confirmDeleteTitle: 'Delete anniversary',
+    confirmDelete: 'Delete "{name}"?'
+  },
   quote: { title: 'Quotes' },
   schedule: {
     title: 'Schedule',

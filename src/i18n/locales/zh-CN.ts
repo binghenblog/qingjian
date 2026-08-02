@@ -12,6 +12,7 @@ export default {
   common: {
     confirm: '确定',
     cancel: '取消',
+    delete: '删除',
     undo: '撤销'
   },
   nav: {
@@ -292,7 +293,28 @@ export default {
     invalidNumber: '请输入有效数值',
     saved: '已保存'
   },
-  anniversary: { title: '纪念日' },
+  anniversary: {
+    title: '纪念日',
+    add: '添加纪念日',
+    count: '个',
+    name: '名称',
+    namePlaceholder: '纪念日名称',
+    note: '备注',
+    notePlaceholder: '选填',
+    date: '日期',
+    month: '月',
+    save: '保存',
+    cancel: '取消',
+    empty: '还没有纪念日，点击右下角 + 添加',
+    today: '就是今天',
+    tomorrow: '明天',
+    daysLeft: '还有 {n} 天',
+    nameRequired: '请输入名称',
+    dateRequired: '请选择日期',
+    added: '已添加纪念日',
+    confirmDeleteTitle: '删除纪念日',
+    confirmDelete: '确定删除「{name}」吗？'
+  },
   quote: { title: '记好句' },
   schedule: {
     title: '日程',
