@@ -194,6 +194,16 @@ export const useAiStore = defineStore('ai', () => {
     await send(opts.instruction)
   }
 
+  /** 清空当前会话消息（审查 M-13）：中止流式、重置状态并落盘，避免直接改 .messages 绕过 store */
+  function clearSession() {
+    const s = current.value
+    if (!s) return
+    controller?.abort()
+    isStreaming.value = false
+    s.messages = []
+    void chatStorage.saveChat(s).catch(() => {})
+  }
+
   /** 监听当前会话消息变化：更新时间、派生标题、列表置顶、防抖落盘 */
   watch(
     () => current.value?.messages,
@@ -221,6 +231,7 @@ export const useAiStore = defineStore('ai', () => {
     addSession,
     renameSession,
     deleteSession,
+    clearSession,
     send,
     stop,
     askWithContext,

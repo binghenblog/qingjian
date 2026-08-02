@@ -109,14 +109,14 @@ async function onFileChosen(e: Event) {
   }
 }
 
-/* ---------- 快捷键说明 ---------- */
+/* ---------- 快捷键说明（desc 存 i18n key，渲染时 t()，切换语言即时生效，审查 M-14） ---------- */
 const shortcuts = [
-  { keys: ['Ctrl', 'K'], desc: '命令面板 · 全局搜索' },
-  { keys: ['Alt', '1'], desc: '仪表盘' },
-  { keys: ['Alt', '2'], desc: '笔记' },
-  { keys: ['Alt', '3'], desc: '待办' },
-  { keys: ['Alt', '4'], desc: 'AI 助手' },
-  { keys: ['Alt', '5'], desc: '设置' }
+  { keys: ['Ctrl', 'K'], descKey: 'settings.shortcutCmdPalette' },
+  { keys: ['Alt', '1'], descKey: 'settings.shortcutDashboard' },
+  { keys: ['Alt', '2'], descKey: 'settings.shortcutNotes' },
+  { keys: ['Alt', '3'], descKey: 'settings.shortcutTodos' },
+  { keys: ['Alt', '4'], descKey: 'settings.shortcutAi' },
+  { keys: ['Alt', '5'], descKey: 'settings.shortcutSettings' }
 ]
 
 const modes: { value: ThemeMode; label: string; icon: string }[] = [
@@ -299,8 +299,8 @@ const locales = SUPPORTED_LOCALES
       <div class="font-semibold text-sm mb-1">{{ t('settings.shortcutTitle') }}</div>
       <p class="text-xs text-fg-faint mt-0 mb-4">{{ t('settings.shortcutHint') }}</p>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        <div v-for="s in shortcuts" :key="s.desc" class="flex items-center justify-between px-3 py-2 rounded-xl kbd-row">
-          <span class="text-sm text-fg-soft">{{ s.desc }}</span>
+        <div v-for="s in shortcuts" :key="s.descKey" class="flex items-center justify-between px-3 py-2 rounded-xl kbd-row">
+          <span class="text-sm text-fg-soft">{{ t(s.descKey) }}</span>
           <span class="flex items-center gap-1">
             <kbd v-for="k in s.keys" :key="k" class="kbd">{{ k }}</kbd>
           </span>

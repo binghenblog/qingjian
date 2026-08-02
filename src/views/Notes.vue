@@ -22,7 +22,7 @@ import { useAiStore } from '@/stores/ai'
 import { useConfirm } from '@/composables/useConfirm'
 import { useToast } from '@/composables/useToast'
 import { md } from '@/services/markdown'
-import { formatNotes } from '@/services/aiContext'
+import { buildContext } from '@/services/aiContext'
 
 const store = useNoteStore()
 const ai = useAiStore()
@@ -221,7 +221,7 @@ function onMoveFolder(e: Event) {
 async function discussWithAI() {
   const n = store.current
   if (!n) return
-  const body = formatNotes([n])
+  const body = buildContext({ notes: [n] })
   if (!body) return
   router.push('/ai')
   await ai.askWithContext({

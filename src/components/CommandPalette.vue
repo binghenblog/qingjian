@@ -6,7 +6,7 @@ import { useNoteStore } from '@/stores/notes'
 import { useTodoStore } from '@/stores/todos'
 import { useAiStore } from '@/stores/ai'
 import { useToast } from '@/composables/useToast'
-import { formatNotes, formatTodos } from '@/services/aiContext'
+import { buildContext } from '@/services/aiContext'
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ 'update:open': [boolean] }>()
@@ -48,20 +48,10 @@ interface PaletteItem {
   hint?: string
 }
 
-/** AI 动作：基于本地数据发起对话 */
-const aiActions: PaletteItem[] = [
-  {
-    kind: 'action',
-    title: t('ai.cmd.summarizeWeek'),
-    icon: 'i-carbon-book',
-    action: () => void summarizeWeek()
-  },
-  {
-    kind: 'action',
-    title: t('ai.cmd.planTodos'),
-    icon: 'i-carbon-chat',
-    action: () => void planTodos()
-  }
+/** AI 动作：基于本地数据发起对话（title 存 i18n key，渲染时 t()，切换语言即时生效，审查 M-14） */
+const aiActionDefs: { titleKey: string; icon: string; action: () => void }[] = [
+  { titleKey: 'ai.cmd.summarizeWeek', icon: 'i-carbon-book', action: () => void summarizeWeek() },
+  { titleKey: 'ai.cmd.planTodos', icon: 'i-carbon-chat', action: () => void planTodos() }
 ]
 
 /** 页面项 + 笔记全文搜索结果（最多 8 条） + AI 动作 */
@@ -70,7 +60,9 @@ const items = computed<PaletteItem[]>(() => {
   const pageItems: PaletteItem[] = pages
     .filter((p) => !query || t(p.key).includes(query))
     .map((p) => ({ kind: 'page', title: t(p.key), icon: p.icon, target: p.to }))
-  const actionItems = aiActions.filter((a) => !query || a.title.includes(query))
+  const actionItems = aiActionDefs
+    .filter((a) => !query || t(a.titleKey).includes(query))
+    .map((a) => ({ kind: 'action' as const, title: t(a.titleKey), icon: a.icon, action: a.action }))
   if (!query) return [...actionItems, ...pageItems]
   const noteItems: PaletteItem[] = noteStore.searchNotes(query, 8).map((r) => ({
     kind: 'note',
@@ -88,7 +80,7 @@ async function summarizeWeek() {
   const weekNotes = noteStore.notes
     .filter((n) => n.updatedAt >= cutoff)
     .sort((a, b) => b.updatedAt - a.updatedAt)
-  const body = formatNotes(weekNotes)
+  const body = buildContext({ notes: weekNotes })
   if (!body) {
     toast.info(t('ai.cmd.noNotesThisWeek'))
     emit('update:open', false)
@@ -106,7 +98,7 @@ async function summarizeWeek() {
 /** 把未完成（且非周期今日已完成）的待办整理成计划 */
 async function planTodos() {
   const pending = todoStore.todos.filter((t) => !t.done && !(t.doneDates && t.doneDates.length > 0))
-  const body = formatTodos(pending)
+  const body = buildContext({ todos: pending })
   if (!body) {
     toast.info(t('ai.cmd.noPendingTodos'))
     emit('update:open', false)

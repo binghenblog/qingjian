@@ -43,9 +43,7 @@ function submit() {
 }
 
 function clearHistory() {
-  const s = ai.current
-  if (!s) return
-  s.messages = []
+  ai.clearSession()
 }
 
 function openNewSession() {
