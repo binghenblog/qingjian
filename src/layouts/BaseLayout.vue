@@ -56,9 +56,9 @@ function openPalette() {
 
 <template>
   <div class="relative h-screen bg-bg text-fg overflow-hidden">
-    <!-- 常驻左上角的半圆导航按钮（仅此按钮切换抽屉；无阴影） -->
+    <!-- 常驻左上角、正方形的导航按钮（棱角稍圆、无阴影、仅此按钮切换抽屉） -->
     <button
-      class="nav-fab fixed top-4 left-3 z-50 grid place-items-center w-6 h-11 rounded-l-none rounded-r-full text-white"
+      class="nav-fab fixed top-4 left-3 z-50 grid place-items-center w-10 h-10 rounded-lg text-white"
       @click="toggle"
       :aria-label="t('nav.toggleAria')"
       :aria-expanded="open ? 'true' : 'false'"
