@@ -143,7 +143,9 @@ function flushSave(): Promise<void> {
   })
 }
 
-let watchedId: string | null = null
+// 初始化为当前笔记 id：避免「组件首次挂载、当前笔记已存在」时 watchedId 为 null，
+// 导致第一次编辑被误判为「切换」而跳过落盘（审查 H-5）。纯切换仍会先 flush 上一篇。
+let watchedId: string | null = store.current?.id ?? null
 /** Tauri 窗口关闭监听的取消函数（审查 M-2） */
 let unlistenClose: (() => void) | undefined
 watch(

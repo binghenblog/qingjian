@@ -87,6 +87,7 @@ export default {
     fieldApiKey: 'API Key',
     rememberKey: '在本机记住密钥（写入 localStorage；不勾选则关闭浏览器即清除）',
     keyHint: '密钥仅保存在本机浏览器，默认只在当前会话有效。纯 Web 端直连云端可能受 CORS 限制；桌面版将经本地后端中转并加密保管，更安全。',
+    keyWarning: '安全提醒：当前 Web 端密钥以明文保存在浏览器存储中，同源任意脚本或 XSS 攻击都可能窃取。请勿在不可信环境输入真实密钥；桌面版将改为经 Rust 后端中转并加密保管，显著降低此风险。',
     exportBtn: '导出备份',
     importMerge: '导入（合并）',
     importReplace: '导入（覆盖）',

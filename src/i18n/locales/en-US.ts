@@ -85,6 +85,7 @@ export default {
     fieldApiKey: 'API Key',
     rememberKey: 'Remember key on this device (writes to localStorage; if off, cleared when browser closes)',
     keyHint: 'The key is stored only in your local browser and is valid for the current session by default. A pure web client connecting to the cloud may hit CORS limits; the desktop build routes through a local backend with encrypted storage for better security.',
+    keyWarning: 'Security notice: on the Web build the key is stored in plaintext in browser storage, so any same-origin script or XSS can steal it. Do not enter a real key in untrusted environments; the desktop build will proxy via the Rust backend with encrypted storage to significantly reduce this risk.',
     exportBtn: 'Export backup',
     importMerge: 'Import (merge)',
     importReplace: 'Import (replace)',

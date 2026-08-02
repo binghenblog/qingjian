@@ -271,8 +271,9 @@ export async function importBackup(backup: BackupFile, mode: ImportMode): Promis
     if (mode === 'replace') {
       await svc.replaceAll(items)
     } else {
-      const existing = new Set((await svc.list()).map((e) => e.id))
-      for (const it of items) if (!existing.has(it.id)) await svc.save(it)
+      // merge：按 id 覆盖（bulkPut 语义）—— 同 id 的备份记录覆盖本地，
+      // 避免「同 id 但内容已更新」的记录被静默丢弃（审查 H-2）
+      for (const it of items) await svc.save(it)
     }
     return items.length
   }

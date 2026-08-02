@@ -76,6 +76,15 @@ async function* tauriChat(
     on_token: channel
   })
 
+  // 启动即 reject（参数/序列化错误等）：记录错误并结束循环，避免 UI 永久卡「生成中」，
+  // 也不产生未处理 rejection（审查 H-4）
+  let invokeError: unknown = null
+  invokeP.catch((e: unknown) => {
+    invokeError = e
+    finished = true
+    resolveWait()
+  })
+
   try {
     while (true) {
       while (queue.length) yield queue.shift() as string
@@ -83,7 +92,9 @@ async function* tauriChat(
       await wait
       wait = new Promise<void>((r) => (resolveWait = r))
     }
-    if (!aborted) await invokeP
+    // 等待 Rust 命令真正结束（无论成功/失败），避免悬空 promise
+    await invokeP.catch(() => {})
+    if (invokeError && !aborted) throw invokeError
   } catch (e) {
     if (aborted) return
     throw e

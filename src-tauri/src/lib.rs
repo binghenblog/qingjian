@@ -28,18 +28,41 @@ struct AiState {
     cancel: Arc<AtomicBool>,
 }
 
-/** 受限内部地址：云元数据 / 链路本地，SSRF 防护（审查 H-5 / M-23） */
+/** 受限内部地址：回环 / 私有网段 / 链路本地 / 唯一本地，SSRF 防护（审查 H-3 / H-5 / M-23）。
+ * 说明：Rust 中转命令 `ai_chat` 仅由「云端」provider 调用（本地 Ollama 走前端直连路径），
+ * 因此此处可放心拦截所有私有/回环地址，避免恶意配置诱导后端携带 API Key 请求内网造成凭证泄漏。 */
 fn is_blocked_host(host: &str) -> bool {
     let h = host.to_lowercase();
-    h == "169.254.169.254"
-        || h == "0.0.0.0"
-        || h.starts_with("169.254.")
-        || h.starts_with("fe80.")
-        || h.starts_with("::")
+    // 回环 / 全零
+    if h == "localhost" || h == "0.0.0.0" || h == "127.0.0.1" || h == "::1" || h == "::" {
+        return true;
+    }
+    if h.contains(':') {
+        // IPv6：链路本地 fe80::/10、唯一本地 fc00::/7
+        return h.starts_with("169.254.") || h.starts_with("fe80") || h.starts_with("fc") || h.starts_with("fd");
+    }
+    if h.contains('.') {
+        // IPv4 链路本地
+        if h.starts_with("169.254.") {
+            return true;
+        }
+        // 解析前两段，判定 RFC 1918 私有网段
+        let mut parts = h.split('.');
+        let first: u32 = match parts.next().and_then(|p| p.parse().ok()) {
+            Some(v) if v <= 255 => v,
+            _ => return false,
+        };
+        let second: u32 = match parts.next().and_then(|p| p.parse().ok()) {
+            Some(v) if v <= 255 => v,
+            _ => return false,
+        };
+        // 10.0.0.0/8、172.16.0.0/12、192.168.0.0/16
+        return first == 10 || (first == 172 && (16..=31).contains(&second)) || (first == 192 && second == 168);
+    }
+    false
 }
 
-/// 校验并归一化 AI 接口地址（审查 H-5）：必须 http/https；拦截云元数据等受限地址。
-/// 注意：本地网关 127.0.0.1 / localhost 仍允许，以保障 Ollama 本地代理。
+/// 校验并归一化 AI 接口地址（审查 H-3 / H-5）：必须 http/https；拦截回环/私有/链路本地地址。
 fn safe_url(raw: &str) -> Result<String, String> {
     let base = raw.trim();
     if base.is_empty() {
@@ -53,12 +76,22 @@ fn safe_url(raw: &str) -> Result<String, String> {
     } else {
         return Err("不支持的协议，仅允许 http/https".into());
     };
-    // 取主机部分（到首个 / ? # 之前），用于 SSRF 拦截
-    let host = after_scheme
+    // 取主机部分并去除端口 / IPv6 方括号，用于 SSRF 拦截
+    let raw_host = after_scheme
         .split(['/', '?', '#'])
         .next()
         .unwrap_or("")
         .to_lowercase();
+    let host = if raw_host.starts_with('[') {
+        // [IPv6]:port 形式
+        raw_host.trim_start_matches('[').split(']').next().unwrap_or("").to_string()
+    } else if raw_host.contains("::") {
+        raw_host.to_string() // 缩写 IPv6，端口须加方括号，此处直接判定
+    } else if let Some(idx) = raw_host.rfind(':') {
+        raw_host[..idx].to_string() // 非 IPv6 缩写：冒号后为端口
+    } else {
+        raw_host
+    };
     if is_blocked_host(&host) {
         return Err("接口地址指向受限内部地址，已被安全策略拦截".into());
     }

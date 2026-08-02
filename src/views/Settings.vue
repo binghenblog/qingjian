@@ -249,6 +249,10 @@ const locales = SUPPORTED_LOCALES
         <p class="field-hint">
           {{ t('settings.keyHint') }}
         </p>
+        <p class="key-warning mt-2 rounded-lg px-3 py-2 text-[11px] leading-relaxed">
+          <span class="i-carbon-warning-alt mr-1 align-middle" />
+          {{ t('settings.keyWarning') }}
+        </p>
       </div>
     </section>
 
@@ -329,6 +333,14 @@ const locales = SUPPORTED_LOCALES
   margin: 2px 0 0;
   line-height: 1.5;
 }
+
+/* API Key 明文风险提示（审查 H-6） */
+.key-warning {
+  background: color-mix(in srgb, var(--c-warn, #f59e0b) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c-warn, #f59e0b) 45%, transparent);
+  color: var(--c-fg-soft, #6b7280);
+}
+.key-warning .i-carbon-warning-alt { color: var(--c-warn, #f59e0b); }
 
 .seg {
   background: var(--c-bg);

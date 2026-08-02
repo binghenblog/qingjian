@@ -110,11 +110,11 @@ export const useAiStore = defineStore('ai', () => {
     if (firstUser) s.title = firstUser.content.slice(0, 20).replace(/\n/g, ' ').trim()
   }
 
-  /** 防抖保存当前会话 */
-  function scheduleSave() {
+  /** 防抖保存指定会话（默认当前会话）；传入被修改的会话引用，避免切换会话后误存其它会话（审查 H-1） */
+  function scheduleSave(target?: ChatSession) {
     clearTimeout(saveTimer)
     saveTimer = window.setTimeout(() => {
-      const s = current.value
+      const s = target ?? current.value
       if (s) chatStorage.saveChat(s).catch(() => {})
     }, SAVE_DEBOUNCE)
   }
@@ -166,7 +166,7 @@ export const useAiStore = defineStore('ai', () => {
     } finally {
       controller = null
       isStreaming.value = false
-      scheduleSave()
+      scheduleSave(session)
     }
   }
 
@@ -194,7 +194,7 @@ export const useAiStore = defineStore('ai', () => {
       ensureTitle(s)
       // 按更新时间倒序（最新会话置顶）
       sessions.value.sort((a, b) => b.updatedAt - a.updatedAt)
-      scheduleSave()
+      scheduleSave(s)
     },
     { deep: true }
   )
