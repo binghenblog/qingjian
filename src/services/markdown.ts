@@ -16,5 +16,6 @@ export const md = new MarkdownIt({
 
 md.validateLink = (url: string) => {
   const u = url.trim().toLowerCase()
-  return !/^(javascript|vbscript|data|file):/.test(u)
+  // 拦截危险 / 非常用协议（审查 H-7 / L-8）：补充 ftp: / tel:，仅放行 http/https/mailto/相对路径
+  return !/^(javascript|vbscript|data|file|ftp|tel):/.test(u)
 }

@@ -143,11 +143,11 @@ export const useAiStore = defineStore('ai', () => {
     const session = current.value
     if (!content || isStreaming.value || !session) return
     if (needsKey()) return
-    session.messages.push({ role: 'user', content })
+    session.messages.push({ role: 'user', content, id: crypto.randomUUID() })
     isStreaming.value = true
     status.value = tt('ai.generating')
 
-    const assistant = { role: 'assistant' as const, content: '' }
+    const assistant = { role: 'assistant' as const, content: '', id: crypto.randomUUID() }
     session.messages.push(assistant)
 
     const messages: ChatMessage[] = session.messages

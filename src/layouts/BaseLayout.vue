@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import CommandPalette from '@/components/CommandPalette.vue'
@@ -37,6 +37,16 @@ function toggle() {
   open.value = !open.value
 }
 
+/** Esc 关闭抽屉（审查 L-5）；背后主区保持可交互（非模态设计） */
+function onKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && open.value) {
+    e.preventDefault()
+    open.value = false
+  }
+}
+onMounted(() => window.addEventListener('keydown', onKeydown))
+onUnmounted(() => window.removeEventListener('keydown', onKeydown))
+
 // 导航：图标在上、文字在下的圆角卡片（v0.3.0 导航改版）
 const nav = [
   { to: '/', key: 'nav.dashboard', icon: 'i-carbon-dashboard' },
@@ -72,6 +82,8 @@ function openPalette() {
       class="drawer fixed top-0 left-0 z-40 h-screen w-[190px] max-w-[72vw] bg-bg
              flex flex-col gap-2 p-3 pt-16 transition-transform duration-200 ease-out"
       :class="open ? 'translate-x-0' : '-translate-x-full'"
+      :inert="open ? undefined : true"
+      :aria-hidden="open ? undefined : 'true'"
       aria-label="main navigation"
     >
       <!-- 顶部：Logo（避开左上角半圆按钮） -->

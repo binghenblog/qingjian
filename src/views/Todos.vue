@@ -53,9 +53,9 @@ function add() {
   draftDue.value = ''
 }
 
-/** 截止日短标签 MM-DD */
-function dueLabel(d: string): string {
-  return d.slice(5)
+/** 截止日短标签 MM-DD（空值兜底，避免非空断言在异常数据下崩溃，审查 L-3） */
+function dueLabel(d?: string): string {
+  return d ? d.slice(5) : ''
 }
 /** 是否逾期（未完成、非每日、截止日早于今天） */
 function isOverdue(t: TodoRecord): boolean {
@@ -131,7 +131,7 @@ function isPreset(cat: string) {
                   <span v-if="store.isDone(todo)" class="i-carbon-checkmark text-[13px] leading-none text-white" />
                 </button>
                 <span class="flex-1 text-sm truncate" :class="store.isDone(todo) ? 'line-through text-fg-faint' : ''">{{ todo.title }}</span>
-                <span class="text-[11px] text-fg-faint shrink-0">{{ dueLabel(todo.dueDate!) }}</span>
+                <span class="text-[11px] text-fg-faint shrink-0">{{ dueLabel(todo.dueDate) }}</span>
                 <span class="cat-chip text-[11px] px-1.5 py-0.5 rounded-full shrink-0">{{ todo.category }}</span>
               </li>
             </ul>

@@ -15,7 +15,7 @@ const priorityMeta: Record<TodoPriority, { label: string; cls: string }> = {
 
 <template>
   <span class="flex items-center gap-1.5 shrink-0">
-    <span class="badge" :class="priorityMeta[priority].cls">{{ t(priorityMeta[priority].label) }}</span>
+    <span class="badge" :class="(priorityMeta[priority] ?? priorityMeta.medium).cls">{{ t((priorityMeta[priority] ?? priorityMeta.medium).label) }}</span>
     <span v-if="tag" class="badge badge-tag">
       <span class="i-carbon-tag text-[10px]" />
       {{ tag }}

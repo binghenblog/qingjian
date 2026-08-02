@@ -180,10 +180,10 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- 气泡 -->
+        <!-- 气泡（稳定 id 作 key，避免重排/删除错配，审查 L-7） -->
         <div
           v-for="(b, i) in messages"
-          :key="i"
+          :key="b.id ?? i"
           class="flex"
           :class="b.role === 'user' ? 'justify-end' : 'justify-start'"
         >

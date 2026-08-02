@@ -148,8 +148,13 @@ interface CrudStorage<T extends { id: string }> {
 function createCrud<T extends { id: string }>(table: Table<T, string>, orderBy: string): CrudStorage<T> {
   return {
     list: () => table.orderBy(orderBy).reverse().toArray() as Promise<T[]>,
-    save: (item: T) => table.put(item) as unknown as Promise<void>,
-    delete: (id: string) => table.delete(id) as unknown as Promise<void>,
+    // 显式 await 后以 Promise<void> 返回，避免把 Promise<Key> 错误断言为 Promise<void>（审查 L-1）
+    save: async (item: T) => {
+      await table.put(item)
+    },
+    delete: async (id: string) => {
+      await table.delete(id)
+    },
     replaceAll: async (list: T[]) => {
       await db.transaction('rw', table, async () => {
         await table.clear()

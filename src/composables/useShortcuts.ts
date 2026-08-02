@@ -20,6 +20,11 @@ export function useShortcuts() {
 
   function onKeydown(e: KeyboardEvent) {
     if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return
+    // 输入框 / 可编辑区聚焦时不拦截，避免误触导航（审查 L-4）
+    const el = e.target as HTMLElement | null
+    if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return
+    // 命令面板 / 确认弹窗打开时屏蔽导航快捷键，避免背后误切页面（审查 L-6）
+    if (document.querySelector('.palette-mask, .confirm-mask')) return
     const to = NAV_KEYS[e.key]
     if (!to) return
     e.preventDefault()
