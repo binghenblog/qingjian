@@ -5,6 +5,10 @@ import { useTheme, type ThemeMode } from '@/composables/useTheme'
 import { useSettingsStore, type AIProviderType } from '@/stores/settings'
 import { useNoteStore } from '@/stores/notes'
 import { useTodoStore } from '@/stores/todos'
+import { useLedgerStore } from '@/stores/ledger'
+import { useFitnessStore } from '@/stores/fitness'
+import { useAnniversariesStore } from '@/stores/anniversaries'
+import { useQuotesStore } from '@/stores/quotes'
 import { useConfirm } from '@/composables/useConfirm'
 import { exportToFile, readBackupFile, importBackup, type ImportMode } from '@/services/backup'
 import { SUPPORTED_LOCALES } from '@/i18n'
@@ -13,6 +17,10 @@ const { theme, setTheme } = useTheme()
 const settings = useSettingsStore()
 const noteStore = useNoteStore()
 const todoStore = useTodoStore()
+const ledgerStore = useLedgerStore()
+const fitnessStore = useFitnessStore()
+const anniversariesStore = useAnniversariesStore()
+const quotesStore = useQuotesStore()
 const { t } = useI18n()
 const { confirm } = useConfirm()
 
@@ -73,6 +81,10 @@ async function onFileChosen(e: Event) {
     try {
       await noteStore.reload()
       todoStore.reload()
+      await ledgerStore.load()
+      await fitnessStore.load()
+      await anniversariesStore.load()
+      await quotesStore.load()
       dataMsg.value = {
         type: 'ok',
         text: t('settings.importSuccess', {

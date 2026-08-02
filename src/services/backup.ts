@@ -1,5 +1,22 @@
-import { storage, chatStorage, type NoteRecord } from './storage'
-import type { TodoRecord, ChatSession } from '@/types'
+import {
+  storage,
+  chatStorage,
+  transactionStorage,
+  workoutStorage,
+  weightStorage,
+  anniversaryStorage,
+  quoteStorage,
+  type NoteRecord
+} from './storage'
+import type {
+  TodoRecord,
+  ChatSession,
+  Transaction,
+  WorkoutRecord,
+  WeightRecord,
+  Anniversary,
+  Quote
+} from '@/types'
 import { le } from '@/i18n/errors'
 
 /**
@@ -9,7 +26,7 @@ import { le } from '@/i18n/errors'
  * - 安全：AI API Key 默认不导出（避免备份文件泄露密钥）
  */
 
-const BACKUP_VERSION = 1
+const BACKUP_VERSION = 2
 
 /** 参与备份的 localStorage key（不含 API Key 所在的 settings，settings 单独脱敏处理） */
 const LS_KEYS = {
@@ -33,6 +50,12 @@ export interface BackupFile {
   /** 设置（已脱敏，不含 aiApiKey） */
   settings: Record<string, unknown> | null
   theme: string | null
+  /** v0.3.0 新增模块数据；旧版备份（version<2）不含这些字段 */
+  transactions?: Transaction[]
+  workouts?: WorkoutRecord[]
+  weights?: WeightRecord[]
+  anniversaries?: Anniversary[]
+  quotes?: Quote[]
 }
 
 function readJson<T>(key: string, fallback: T): T {
@@ -75,7 +98,12 @@ export async function createBackup(): Promise<BackupFile> {
     noteFolders: readJson<string[]>(LS_KEYS.noteFolders, []),
     chats: await chatStorage.listChats(),
     settings: safeSettings,
-    theme: localStorage.getItem(LS_KEYS.theme)
+    theme: localStorage.getItem(LS_KEYS.theme),
+    transactions: await transactionStorage.list(),
+    workouts: await workoutStorage.list(),
+    weights: await weightStorage.list(),
+    anniversaries: await anniversaryStorage.list(),
+    quotes: await quoteStorage.list()
   }
 }
 
@@ -106,6 +134,10 @@ export function validateBackup(data: unknown): string | null {
   if (!Array.isArray(b.notes) || !Array.isArray(b.todos)) return le('errors.backupIncomplete')
   // chats 为可选项（旧版备份可能不含），存在则必须合法
   if (b.chats !== undefined && !Array.isArray(b.chats)) return le('errors.backupIncomplete')
+  // v0.3.0 新增实体为可选项（旧版备份 version<2 不含），存在则必须为数组
+  for (const k of ['transactions', 'workouts', 'weights', 'anniversaries', 'quotes'] as const) {
+    if (b[k] !== undefined && !Array.isArray(b[k])) return le('errors.backupIncomplete')
+  }
   // 逐元素结构校验（审查 M-19）：缺少 id 会导致 IndexedDB 写入异常
   for (const n of b.notes as unknown[]) {
     if (!n || typeof n !== 'object' || typeof (n as Record<string, unknown>).id !== 'string') {
@@ -120,6 +152,11 @@ export type ImportMode = 'merge' | 'replace'
 export interface ImportResult {
   notes: number
   todos: number
+  transactions: number
+  workouts: number
+  weights: number
+  anniversaries: number
+  quotes: number
 }
 
 /**
@@ -224,7 +261,37 @@ export async function importBackup(backup: BackupFile, mode: ImportMode): Promis
     mergeList(LS_KEYS.noteFolders, backup.noteFolders)
   }
 
-  return { notes: incomingNotes.length, todos: backup.todos.length }
+  /* ---------- v0.3.0 新增模块数据（Dexie 本地库） ---------- */
+  /** 通用 Dexie 表导入：merge 按 id 去重，replace 整体替换 */
+  async function importTable<T extends { id: string }>(
+    list: T[] | undefined,
+    svc: { list: () => Promise<T[]>; save: (i: T) => Promise<void>; replaceAll: (l: T[]) => Promise<void> }
+  ): Promise<number> {
+    const items = (list ?? []).map((x) => ({ ...x, id: String(x.id) }))
+    if (mode === 'replace') {
+      await svc.replaceAll(items)
+    } else {
+      const existing = new Set((await svc.list()).map((e) => e.id))
+      for (const it of items) if (!existing.has(it.id)) await svc.save(it)
+    }
+    return items.length
+  }
+
+  const cntTransactions = await importTable(backup.transactions, transactionStorage)
+  const cntWorkouts = await importTable(backup.workouts, workoutStorage)
+  const cntWeights = await importTable(backup.weights, weightStorage)
+  const cntAnniversaries = await importTable(backup.anniversaries, anniversaryStorage)
+  const cntQuotes = await importTable(backup.quotes, quoteStorage)
+
+  return {
+    notes: incomingNotes.length,
+    todos: backup.todos.length,
+    transactions: cntTransactions,
+    workouts: cntWorkouts,
+    weights: cntWeights,
+    anniversaries: cntAnniversaries,
+    quotes: cntQuotes
+  }
 }
 
 /** 从用户选择的文件读取并解析备份 */

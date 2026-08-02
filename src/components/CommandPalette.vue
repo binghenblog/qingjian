@@ -29,6 +29,10 @@ const pages = [
   { key: 'nav.dashboard', to: '/', icon: 'i-carbon-dashboard' },
   { key: 'nav.notes', to: '/notes', icon: 'i-carbon-document' },
   { key: 'nav.todos', to: '/todos', icon: 'i-carbon-task' },
+  { key: 'nav.ledger', to: '/ledger', icon: 'i-carbon-calculator' },
+  { key: 'nav.fitness', to: '/fitness', icon: 'i-carbon-run' },
+  { key: 'nav.anniversaries', to: '/anniversaries', icon: 'i-carbon-calendar' },
+  { key: 'nav.quotes', to: '/quotes', icon: 'i-carbon-bookmark' },
   { key: 'nav.ai', to: '/ai', icon: 'i-carbon-ai-status' },
   { key: 'nav.settings', to: '/settings', icon: 'i-carbon-settings' }
 ]
