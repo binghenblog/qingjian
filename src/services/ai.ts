@@ -45,9 +45,28 @@ async function* readLines(body: ReadableStream<Uint8Array>): AsyncGenerator<stri
         if (line) yield line
       }
     }
+    // 流结束：flush 解码器剩余字节，并产出不以换行结尾的末行（审查 M-6）
+    buf += decoder.decode()
+    if (buf.trim()) yield buf.trim()
   } finally {
     reader.releaseLock()
   }
+}
+
+/**
+ * 为请求信号附加总超时，避免 Web 模式无响应时永久挂起（审查 M-7）。
+ * 若调用方已提供 signal（用户中止），两者任一触发即中止。
+ */
+function withTimeout(signal?: AbortSignal, ms = 120_000): AbortSignal {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), ms)
+  const clear = () => clearTimeout(timer)
+  ctrl.signal.addEventListener('abort', clear, { once: true })
+  if (signal) {
+    if (signal.aborted) ctrl.abort()
+    else signal.addEventListener('abort', () => ctrl.abort(), { once: true })
+  }
+  return ctrl.signal
 }
 
 /** 云端模式拦截的受限内部地址（审查 M-23 SSRF 防护，主要防云元数据凭证窃取） */
@@ -97,7 +116,7 @@ export class OllamaProvider implements AIProvider {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: this.cfg.model, messages, stream: true }),
-      signal
+      signal: withTimeout(signal)
     })
     if (!res.ok || !res.body) throw new Error(le('errors.ollamaConnect', { status: res.status }))
     for await (const line of readLines(res.body)) {
@@ -142,10 +161,13 @@ export class CloudProvider implements AIProvider {
       method: 'POST',
       headers,
       body: JSON.stringify({ model: this.cfg.model, messages, stream: true }),
-      signal
+      signal: withTimeout(signal)
     })
     if (!res.ok || !res.body) {
       const txt = await res.text().catch(() => '')
+      // 区分鉴权失败与限流，给出更明确提示（审查 L-9）
+      if (res.status === 401) throw new Error(le('errors.cloudUnauthorized'))
+      if (res.status === 429) throw new Error(le('errors.cloudRateLimited'))
       throw new Error(le('errors.cloudFailed', { status: res.status, detail: txt ? ': ' + txt.slice(0, 200) : '' }))
     }
     for await (const line of readLines(res.body)) {

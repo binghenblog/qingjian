@@ -352,6 +352,8 @@ export default {
     aiBlockedHost: '接口地址指向受限内部地址，已被安全策略拦截',
     ollamaConnect: 'Ollama 连接失败 ({status})，确认本地已启动 Ollama',
     cloudFailed: '云端请求失败 ({status}){detail}',
+    cloudUnauthorized: '云端鉴权失败（401）：请检查 API Key 是否正确',
+    cloudRateLimited: '请求过于频繁（429）：请稍后再试',
     idbDisabled: '当前浏览器禁用了本地数据库（IndexedDB），笔记无法持久化。请检查隐私/无痕模式设置。',
     idbReadFailed: '本地数据库读取失败，笔记加载不出来',
     removeFolderFailed: '删除文件夹失败：{msg}',

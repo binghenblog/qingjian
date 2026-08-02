@@ -349,6 +349,8 @@ export default {
     aiBlockedHost: 'Endpoint points to a restricted internal address and was blocked by security policy',
     ollamaConnect: 'Ollama connection failed ({status}). Make sure Ollama is running locally',
     cloudFailed: 'Cloud request failed ({status}){detail}',
+    cloudUnauthorized: 'Cloud auth failed (401): check your API Key',
+    cloudRateLimited: 'Too many requests (429): please try again later',
     idbDisabled: 'The current browser has disabled the local database (IndexedDB); notes cannot be persisted. Check privacy/incognito settings.',
     idbReadFailed: 'Local database read failed; notes could not be loaded',
     removeFolderFailed: 'Failed to delete folder: {msg}',
