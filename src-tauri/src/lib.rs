@@ -102,7 +102,7 @@ fn safe_url(raw: &str) -> Result<String, String> {
 /// 云端 AI 流式中转（审查 C-2 / C-3）。
 /// 由 Rust 后端发起请求，密钥不进入前端 JS，规避 WebView CSP / CORS 限制；
 /// 通过 `Channel` 把每个 token 推回前端，保持流式体验。
-#[tauri::command]
+#[tauri::command(rename = "ai-chat")]
 async fn ai_chat(
     config: AiConfig,
     messages: Vec<ChatMsg>,
@@ -209,7 +209,7 @@ async fn ai_chat(
 }
 
 /// 取消进行中的 AI 流式请求（审查 H-8 / M-10）：仅置位当前请求的令牌。
-#[tauri::command]
+#[tauri::command(rename = "cancel-ai-chat")]
 fn cancel_ai_chat(state: State<'_, AiState>) {
     let guard = state.cancel.lock().unwrap();
     guard.store(true, Ordering::Relaxed);

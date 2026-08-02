@@ -1,0 +1,5 @@
+# 允许前端调用 cancel-ai-chat 命令，中止正在进行的 AI 流式请求。
+[[permission]]
+identifier = "cancel-ai-chat"
+description = "允许调用 cancel-ai-chat 命令，中止正在进行的 AI 流式请求。"
+commands.allow = ["cancel-ai-chat"]

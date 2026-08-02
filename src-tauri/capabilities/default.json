@@ -6,8 +6,8 @@
   "permissions": [
     "core:default",
     "dialog:default",
-    "ai_chat",
-    "cancel_ai_chat",
+    "ai-chat",
+    "cancel-ai-chat",
     "fs:allow-read-text-file",
     "fs:allow-write-text-file",
     "fs:allow-exists",

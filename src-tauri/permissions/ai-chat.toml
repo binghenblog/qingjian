@@ -1,0 +1,5 @@
+# 允许前端调用 ai-chat 命令，由 Rust 后端流式中转 AI 响应。
+[[permission]]
+identifier = "ai-chat"
+description = "允许调用 ai-chat 命令，通过 Rust 后端流式中转 AI 响应。"
+commands.allow = ["ai-chat"]

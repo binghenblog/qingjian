@@ -3,7 +3,7 @@ import type { AIConfig, AIProvider, ChatMessage, ChatRole } from './ai'
 /**
  * 桌面端 AI 中转桥（审查 C-2 / C-3）。
  *
- * 通过 Tauri IPC 调用 Rust 后端 `ai_chat` 命令发起云端请求：密钥不进入前端 JS、规避
+ * 通过 Tauri IPC 调用 Rust 后端 `ai-chat` 命令发起云端请求：密钥不进入前端 JS、规避
  * WebView 的 CSP / CORS 限制，token 经 Channel 流式推回。
  *
  * 关键点：本文件**绝不静态导入** `@tauri-apps/api`，只在运行时动态 `import()`，
@@ -62,7 +62,7 @@ async function* tauriChat(
         finished = true
         // 通知 Rust 端中止正在进行的 HTTP 流（审查 H-8）
         core
-          .invoke('cancel_ai_chat')
+          .invoke('cancel-ai-chat')
           .catch(() => {})
         resolveWait()
       },
@@ -70,7 +70,7 @@ async function* tauriChat(
     )
   }
 
-  const invokeP = core.invoke('ai_chat', {
+  const invokeP = core.invoke('ai-chat', {
     config: { base_url: cfg.baseUrl, api_key: cfg.apiKey, model: cfg.model },
     messages: messages.map((m) => ({ role: m.role as ChatRole, content: m.content })),
     on_token: channel
