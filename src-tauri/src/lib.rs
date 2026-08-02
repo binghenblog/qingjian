@@ -5,7 +5,7 @@
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tauri::ipc::Channel;
 use tauri::State;
 
@@ -22,10 +22,11 @@ struct ChatMsg {
     content: String,
 }
 
-/// 跨命令共享状态：AI 流式请求的可取消标记（审查 H-8）。
-/// 前端点「停止」→ 调用 `cancel_ai_chat` 置位 → `ai_chat` 循环内检测到后中止。
+/// 跨命令共享状态：当前 AI 流式请求的取消标记（审查 H-8 / M-10）。
+/// 每次 `ai_chat` 生成独立的 `Arc<AtomicBool>` 作为取消令牌并写入此处，
+/// 因此取消「当前」请求不会误伤其它并发请求，新请求也不会清除旧请求的取消标志。
 struct AiState {
-    cancel: Arc<AtomicBool>,
+    cancel: Mutex<Arc<AtomicBool>>,
 }
 
 /** 受限内部地址：回环 / 私有网段 / 链路本地 / 唯一本地，SSRF 防护（审查 H-3 / H-5 / M-23）。
@@ -108,8 +109,9 @@ async fn ai_chat(
     on_token: Channel<String>,
     state: State<'_, AiState>,
 ) -> Result<(), String> {
-    // 重置取消标记（审查 H-8）
-    state.cancel.store(false, Ordering::Relaxed);
+    // 生成本次请求的独立取消令牌，替换当前令牌（审查 M-10）
+    let cancel_token = Arc::new(AtomicBool::new(false));
+    *state.cancel.lock().unwrap() = cancel_token.clone();
 
     let base = safe_url(&config.base_url)?;
     let url = if base.ends_with("/chat/completions") {
@@ -172,8 +174,8 @@ async fn ai_chat(
     let mut stream = res.bytes_stream();
     let mut buf = String::new();
     while let Some(chunk) = stream.next().await {
-        // 用户点「停止」→ 中止循环（审查 H-8）
-        if state.cancel.load(Ordering::Relaxed) {
+        // 用户点「停止」→ 中止循环（审查 H-8 / M-10，仅检查本请求的令牌）
+        if cancel_token.load(Ordering::Relaxed) {
             break;
         }
         let bytes = chunk.map_err(|e| e.to_string())?;
@@ -206,10 +208,11 @@ async fn ai_chat(
     Ok(())
 }
 
-/// 取消进行中的 AI 流式请求（审查 H-8）：前端「停止」按钮调用。
+/// 取消进行中的 AI 流式请求（审查 H-8 / M-10）：仅置位当前请求的令牌。
 #[tauri::command]
 fn cancel_ai_chat(state: State<'_, AiState>) {
-    state.cancel.store(true, Ordering::Relaxed);
+    let guard = state.cancel.lock().unwrap();
+    guard.store(true, Ordering::Relaxed);
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -218,7 +221,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .manage(AiState {
-            cancel: Arc::new(AtomicBool::new(false)),
+            cancel: Mutex::new(Arc::new(AtomicBool::new(false))),
         })
         .invoke_handler(tauri::generate_handler![ai_chat, cancel_ai_chat])
         .run(tauri::generate_context!())
