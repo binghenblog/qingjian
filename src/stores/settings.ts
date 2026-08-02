@@ -124,6 +124,10 @@ export const useSettingsStore = defineStore('settings', () => {
     clearTimeout(settingsTimer)
     persistNow()
   }
+  /** 窗口/页面关闭前同步落盘，防止 200ms 防抖窗口内丢失最后改动（审查 L-40 / H-1 增补至设置项；todos/notes 已具备 beforeunload flush） */
+  if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', flush)
+  }
   watch([userName, aiProvider, aiBaseUrl, aiModel, aiKeyRemember, locale, ledgerShowSummary], () => {
     clearTimeout(settingsTimer)
     settingsTimer = window.setTimeout(persistNow, 200)

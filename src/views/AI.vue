@@ -31,7 +31,11 @@ const needsKey = computed(() => settings.aiProvider === 'cloud' && !settings.aiA
 
 async function scrollBottom() {
   await nextTick()
-  scrollEl.value?.scrollTo({ top: scrollEl.value.scrollHeight, behavior: 'smooth' })
+  const el = scrollEl.value
+  if (!el) return
+  // 尊重「减少动画」偏好：前庭敏感用户避免平滑滚动（审查 M-18）
+  const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  el.scrollTo({ top: el.scrollHeight, behavior: reduce ? 'auto' : 'smooth' })
 }
 
 /** 提交输入框内容（流式发送已下沉到 store，便于命令面板 / 笔记页复用） */
@@ -167,8 +171,9 @@ onMounted(() => {
         <RouterLink to="/settings" class="text-brand-strong hover:underline" :class="{ 'ml-auto': !messages.length }">{{ t('ai.goToSettings') }}</RouterLink>
       </div>
 
-      <!-- 对话区（role=log：屏幕阅读器可感知新回复追加，审查 H-12） -->
-      <div ref="scrollEl" class="flex-1 overflow-auto space-y-4 pb-4" role="log" aria-live="polite" aria-label="对话记录">
+      <!-- 对话区：流式逐 token 追加，若设 aria-live 读屏器会逐块朗读刷屏；
+           故关闭 live（role=log 默认 polite 需显式覆盖），改由上方 status 区域一次性播报状态（审查 H-12 / C-9） -->
+      <div ref="scrollEl" class="flex-1 overflow-auto space-y-4 pb-4" role="log" aria-live="off" aria-label="对话记录">
         <!-- 空状态 -->
         <div v-if="messages.length === 0" class="grid place-items-center h-full text-center">
           <div>
