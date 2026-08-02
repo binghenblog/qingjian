@@ -137,7 +137,7 @@ export default {
     noteLabel: 'Note'
   },
   todos: {
-    title: 'Tasks',
+    title: 'Schedule / Tasks',
     deleteCategory: 'Delete category',
     deleteCategoryTitle: 'Delete category',
     deleteCategoryMsg: 'Delete category "{cat}"? Its tasks will move to "Life"',
@@ -292,7 +292,16 @@ export default {
   },
   anniversary: { title: 'Anniversaries' },
   quote: { title: 'Quotes' },
-  schedule: { title: 'Schedule' },
+  schedule: {
+    title: 'Schedule',
+    agenda: 'Agenda',
+    overdue: 'Overdue',
+    today: 'Due today',
+    upcoming: 'Upcoming',
+    dueDate: 'Due date',
+    empty: 'No due tasks',
+    emptyToday: 'Nothing due today'
+  },
   errors: {
     aiUrlCloud: 'Set the cloud endpoint in Settings first',
     aiUrlLocal: 'Set the Ollama endpoint in Settings first',

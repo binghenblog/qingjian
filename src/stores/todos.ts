@@ -259,6 +259,27 @@ export const useTodoStore = defineStore('todos', () => {
 
   const doneCount = computed(() => todos.value.filter((t) => isDone(t)).length)
 
+  /** 日程分组（v0.3.0）：非每日、未完成、有截止日的任务，按 逾期 / 今日 / 即将到期 分组 */
+  const agenda = computed(() => {
+    const todayK = dateKey()
+    const g: { overdue: TodoRecord[]; today: TodoRecord[]; upcoming: TodoRecord[] } = {
+      overdue: [],
+      today: [],
+      upcoming: []
+    }
+    for (const t of todos.value) {
+      if (t.category === DAILY_CATEGORY || t.done || !t.dueDate) continue
+      if (t.dueDate < todayK) g.overdue.push(t)
+      else if (t.dueDate === todayK) g.today.push(t)
+      else g.upcoming.push(t)
+    }
+    const byDateAsc = (a: TodoRecord, b: TodoRecord) => (a.dueDate! < b.dueDate! ? -1 : 1)
+    g.overdue.sort(byDateAsc) // 最久未还（最早）在前
+    g.today.sort(byDateAsc)
+    g.upcoming.sort(byDateAsc) // 最近在前
+    return g
+  })
+
   /** 某天完成的任务数（每日任务查 doneDates，普通任务查 completedAt） */
   function completedCountOn(day: string): number {
     return todos.value.filter((t) => {
@@ -274,7 +295,13 @@ export const useTodoStore = defineStore('todos', () => {
 
   /* ---------- 动作 ---------- */
 
-  function add(title: string, priority: TodoPriority = 'medium', tag?: string, category = DAILY_CATEGORY) {
+  function add(
+    title: string,
+    priority: TodoPriority = 'medium',
+    tag?: string,
+    category = DAILY_CATEGORY,
+    dueDate?: string
+  ) {
     const t = title.trim()
     if (!t) return
     todos.value.unshift({
@@ -284,9 +311,17 @@ export const useTodoStore = defineStore('todos', () => {
       priority,
       tag: tag?.trim() || undefined,
       category,
+      dueDate,
       doneDates: category === DAILY_CATEGORY ? [] : undefined,
       createdAt: Date.now()
     })
+  }
+
+  /** 设置 / 清除任务截止日（v0.3.0 日程合并） */
+  function setDueDate(id: string, date?: string) {
+    const t = todos.value.find((x) => x.id === id)
+    if (!t) return
+    t.dueDate = date || undefined
   }
 
   function toggle(id: string) {
@@ -338,6 +373,7 @@ export const useTodoStore = defineStore('todos', () => {
     doneCount,
     usedTags,
     yesterdayMissed,
+    agenda,
     isDone,
     byCategory,
     categoryProgress,
@@ -348,6 +384,7 @@ export const useTodoStore = defineStore('todos', () => {
     add,
     toggle,
     remove,
+    setDueDate,
     addCategory,
     removeCategory
   }

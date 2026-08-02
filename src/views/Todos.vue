@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useTodoStore, PRESET_CATEGORIES } from '@/stores/todos'
+import { useTodoStore, PRESET_CATEGORIES, dateKey } from '@/stores/todos'
 import { useConfirm } from '@/composables/useConfirm'
 import TodoBadges from '@/components/TodoBadges.vue'
-import type { TodoPriority } from '@/types'
+import type { TodoPriority, TodoRecord } from '@/types'
 import { DAILY_CATEGORY } from '@/types'
 
 const store = useTodoStore()
@@ -17,6 +17,7 @@ const activeCat = ref(DAILY_CATEGORY)
 const draft = ref('')
 const draftPriority = ref<TodoPriority>('medium')
 const draftTag = ref('')
+const draftDue = ref('')
 
 /** 自定义分类 */
 const addingCat = ref(false)
@@ -46,9 +47,19 @@ const isDaily = computed(() => activeCat.value === DAILY_CATEGORY)
 
 function add() {
   if (!draft.value.trim()) return
-  store.add(draft.value, draftPriority.value, draftTag.value, activeCat.value)
+  store.add(draft.value, draftPriority.value, draftTag.value, activeCat.value, draftDue.value || undefined)
   draft.value = ''
   draftTag.value = ''
+  draftDue.value = ''
+}
+
+/** 截止日短标签 MM-DD */
+function dueLabel(d: string): string {
+  return d.slice(5)
+}
+/** 是否逾期（未完成、非每日、截止日早于今天） */
+function isOverdue(t: TodoRecord): boolean {
+  return !!t.dueDate && t.dueDate < dateKey() && !store.isDone(t) && t.category !== DAILY_CATEGORY
 }
 
 function confirmAddCat() {
@@ -92,6 +103,43 @@ function isPreset(cat: string) {
         {{ t('todos.doneOf', { done: progress.done, total: progress.total }) }}
       </span>
     </div>
+
+    <!-- 日程安排（与待办合并，v0.3.0） -->
+    <section class="agenda-card rounded-2xl p-5 space-y-4">
+      <div class="font-semibold text-sm">{{ t('schedule.agenda') }}</div>
+      <template v-if="store.agenda.overdue.length || store.agenda.today.length || store.agenda.upcoming.length">
+        <div
+          v-for="grp in ([
+            { key: 'overdue', items: store.agenda.overdue, label: t('schedule.overdue'), cls: 'text-red-500' },
+            { key: 'today', items: store.agenda.today, label: t('schedule.today'), cls: 'text-amber-500' },
+            { key: 'upcoming', items: store.agenda.upcoming, label: t('schedule.upcoming'), cls: 'text-fg-soft' }
+          ] as const)"
+          :key="grp.key"
+        >
+          <div v-if="grp.items.length" class="space-y-2">
+            <div class="text-xs font-medium" :class="grp.cls">{{ grp.label }} · {{ grp.items.length }}</div>
+            <ul class="space-y-1.5">
+              <li v-for="todo in grp.items" :key="todo.id" class="flex items-center gap-3 px-3 py-2 rounded-xl bg-bg">
+                <button
+                  @click="store.toggle(todo.id)"
+                  role="checkbox"
+                  :aria-checked="store.isDone(todo) ? 'true' : 'false'"
+                  :aria-label="t('todos.completeTask', { title: todo.title })"
+                  class="check w-5 h-5 rounded-full flex items-center justify-center shrink-0 cursor-pointer"
+                  :class="store.isDone(todo) ? 'check-done' : ''"
+                >
+                  <span v-if="store.isDone(todo)" class="i-carbon-checkmark text-[13px] leading-none text-white" />
+                </button>
+                <span class="flex-1 text-sm truncate" :class="store.isDone(todo) ? 'line-through text-fg-faint' : ''">{{ todo.title }}</span>
+                <span class="text-[11px] text-fg-faint shrink-0">{{ dueLabel(todo.dueDate!) }}</span>
+                <span class="cat-chip text-[11px] px-1.5 py-0.5 rounded-full shrink-0">{{ todo.category }}</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </template>
+      <p v-else class="text-sm text-fg-faint m-0">{{ t('schedule.empty') }}</p>
+    </section>
 
     <!-- 分类 Tab -->
     <div class="flex items-center gap-2 flex-wrap">
@@ -232,6 +280,15 @@ function isPreset(cat: string) {
             <option v-for="t in store.usedTags" :key="t" :value="t" />
           </datalist>
         </div>
+        <label class="flex items-center gap-1.5 shrink-0">
+          <span class="i-carbon-event text-fg-faint text-sm shrink-0" />
+          <input
+            v-model="draftDue"
+            type="date"
+            :placeholder="t('schedule.dueDate')"
+            class="text-xs bg-transparent border border-border rounded-lg px-2 py-1 outline-none text-fg"
+          />
+        </label>
       </div>
     </div>
 
@@ -261,6 +318,14 @@ function isPreset(cat: string) {
           {{ t('todos.streakDays', { n: store.streaks[todo.id] }) }}
         </span>
         <TodoBadges :priority="todo.priority" :tag="todo.tag" />
+        <span
+          v-if="todo.dueDate"
+          class="text-[11px] px-1.5 py-0.5 rounded-full shrink-0 flex items-center gap-0.5"
+          :class="isOverdue(todo) ? 'due-overdue' : 'due-normal'"
+        >
+          <span class="i-carbon-event text-[10px]" />
+          {{ dueLabel(todo.dueDate) }}
+        </span>
         <button
           @click="store.remove(todo.id)"
           class="del opacity-0 group-hover:opacity-100 text-fg-faint hover:text-red-500 cursor-pointer bg-transparent border-none p-1"
@@ -411,6 +476,28 @@ export default {
 .del { transition: opacity 0.15s ease, color 0.15s ease; }
 
 .empty { border: 1.5px dashed var(--c-border); }
+
+/* 日程区（v0.3.0） */
+.agenda-card {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+}
+.cat-chip {
+  background: var(--c-bg);
+  color: var(--c-fg-faint);
+  border: 1px solid var(--c-border);
+  font-weight: 500;
+}
+.due-overdue {
+  background: #fca5a51a;
+  color: #dc2626;
+}
+.dark .due-overdue { color: #f87171; }
+.due-normal {
+  background: var(--c-bg);
+  color: var(--c-fg-faint);
+  border: 1px solid var(--c-border);
+}
 
 .list-enter-active, .list-leave-active { transition: transform 0.2s ease, opacity 0.2s ease; }
 .list-enter-from { opacity: 0; transform: translateY(-8px); }

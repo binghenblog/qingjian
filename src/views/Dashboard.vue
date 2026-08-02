@@ -122,8 +122,9 @@ function addProgress() {
 
     <!-- 两栏内容 -->
     <div class="grid grid-cols-1 lg:grid-cols-5 gap-5">
+      <div class="lg:col-span-3 space-y-5">
       <!-- 左侧：今日待办 -->
-      <section class="panel lg:col-span-3 rounded-2xl p-5">
+      <section class="panel rounded-2xl p-5">
         <div class="flex items-center justify-between mb-4">
           <div class="flex items-center gap-2">
             <span class="text-xs font-bold text-fg-faint tracking-wider">TODAY</span>
@@ -179,7 +180,44 @@ function addProgress() {
             </p>
           </div>
         </div>
-      </section>
+        </section>
+        <!-- 今日日程（v0.3.0 与待办合并） -->
+        <section class="panel rounded-2xl p-5">
+          <div class="flex items-center justify-between mb-4">
+            <span class="font-semibold">{{ t('schedule.today') }}</span>
+            <button
+              @click="router.push('/todos')"
+              class="text-xs text-fg-faint hover:text-brand cursor-pointer bg-transparent border-none flex items-center gap-1"
+            >
+              {{ t('dashboard.allTodos') }}
+              <span class="i-carbon-arrow-right" />
+            </button>
+          </div>
+          <TransitionGroup v-if="store.agenda.today.length" name="list" tag="ul" class="space-y-2 p-0 m-0 list-none">
+            <li
+              v-for="todo in store.agenda.today"
+              :key="todo.id"
+              class="todo-row group flex items-center gap-3 px-3 py-3 rounded-xl"
+            >
+              <button
+                @click="store.toggle(todo.id)"
+                role="checkbox"
+                :aria-checked="store.isDone(todo) ? 'true' : 'false'"
+                :aria-label="`完成任务 ${todo.title}`"
+                class="check w-5 h-5 rounded-full flex items-center justify-center shrink-0 cursor-pointer"
+                :class="{ 'check-done': store.isDone(todo) }"
+              >
+                <span v-if="store.isDone(todo)" class="i-carbon-checkmark text-[13px] leading-none text-white" />
+              </button>
+              <span class="flex-1 text-sm truncate">{{ todo.title }}</span>
+              <span class="cat-chip text-[11px] px-2 py-0.5 rounded-full shrink-0">{{ todo.category }}</span>
+            </li>
+          </TransitionGroup>
+          <div v-else class="empty grid place-items-center py-8 rounded-xl text-center">
+            <p class="text-sm text-fg-faint mt-0 mb-0">{{ t('schedule.emptyToday') }}</p>
+          </div>
+        </section>
+      </div>
 
       <!-- 右侧：本周整体进展 -->
       <section class="panel lg:col-span-2 rounded-2xl p-5 flex flex-col">

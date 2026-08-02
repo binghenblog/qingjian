@@ -14,6 +14,8 @@ export interface TodoRecord {
   tag?: string
   /** 任务分类：每日 / 生活 / 工作 / 学习 / 游戏 / 自定义 */
   category: string
+  /** 可选截止日（YYYY-MM-DD），用于「日程」视图分组（与待办合并，v0.3.0） */
+  dueDate?: string
   /** 每日任务的完成日期集合（YYYY-MM-DD），每天自动重置 */
   doneDates?: string[]
   /** 普通任务完成时间戳（用于按日统计） */

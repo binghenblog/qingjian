@@ -139,7 +139,7 @@ export default {
     noteLabel: '笔记'
   },
   todos: {
-    title: '待办 / 任务',
+    title: '日程 / 任务',
     deleteCategory: '删除分类',
     deleteCategoryTitle: '删除分类',
     deleteCategoryMsg: '删除分类「{cat}」？该分类下的任务会归入「生活」',
@@ -294,7 +294,16 @@ export default {
   },
   anniversary: { title: '纪念日' },
   quote: { title: '记好句' },
-  schedule: { title: '日程' },
+  schedule: {
+    title: '日程',
+    agenda: '日程安排',
+    overdue: '已逾期',
+    today: '今日到期',
+    upcoming: '即将到期',
+    dueDate: '截止日',
+    empty: '暂无到期任务',
+    emptyToday: '今天没有到期任务'
+  },
   // 服务层 / Store 层错误文案（审查 H-14）：这些层无组件上下文，经 i18n.global.t 渲染
   errors: {
     aiUrlCloud: '请先在设置中填写云端接口地址',
