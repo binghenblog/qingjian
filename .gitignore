@@ -40,6 +40,7 @@ qingjian-data/
 # Vite/临时文件
 *.timestamp-*.mjs
 _tmp_*
+.tmp/
 
 
 
