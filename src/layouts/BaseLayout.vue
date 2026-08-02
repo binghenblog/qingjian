@@ -58,7 +58,7 @@ function openPalette() {
   <div class="relative h-screen bg-bg text-fg overflow-hidden">
     <!-- 常驻左上角的半圆导航按钮（仅此按钮切换抽屉；无阴影） -->
     <button
-      class="nav-fab fixed top-4 left-0 z-50 grid place-items-center w-6 h-11 rounded-l-none rounded-r-full text-white"
+      class="nav-fab fixed top-4 left-3 z-50 grid place-items-center w-6 h-11 rounded-l-none rounded-r-full text-white"
       @click="toggle"
       :aria-label="t('nav.toggleAria')"
       :aria-expanded="open ? 'true' : 'false'"
@@ -67,9 +67,9 @@ function openPalette() {
       <span :class="open ? 'i-carbon-close' : 'i-carbon-menu'" class="text-lg" />
     </button>
 
-    <!-- 左侧抽屉式导航（自适应窄宽，小屏限制最大宽度；非模态，仅按钮收起） -->
+    <!-- 左侧抽屉式导航（自适应窄宽；桌面端打开时主区左移让位，仅按钮收起） -->
     <aside
-      class="drawer fixed top-0 left-0 z-40 h-screen w-[190px] max-w-[72vw] bg-bg border-r border-border
+      class="drawer fixed top-0 left-0 z-40 h-screen w-[190px] max-w-[72vw] bg-bg
              flex flex-col gap-2 p-3 pt-16 transition-transform duration-200 ease-out"
       :class="open ? 'translate-x-0' : '-translate-x-full'"
       aria-label="main navigation"
@@ -127,8 +127,11 @@ function openPalette() {
       </div>
     </aside>
 
-    <!-- 主区（始终全宽，抽屉非模态覆盖左侧） -->
-    <main class="h-screen overflow-hidden p-4 md:p-5">
+    <!-- 主区（导航打开时左移 190px，右侧页面自动变窄；移动端保持覆盖） -->
+    <main
+      class="h-screen overflow-hidden p-4 md:p-5 transition-[margin] duration-200"
+      :class="open ? 'md:ml-[190px]' : ''"
+    >
       <div class="card h-full flex flex-col overflow-hidden">
         <header class="h-14 pl-14 pr-4 md:px-6 flex items-center justify-between border-b border-border shrink-0">
           <span class="font-semibold truncate">{{ pageTitle }}</span>
