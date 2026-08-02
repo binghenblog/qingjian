@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import CommandPalette from '@/components/CommandPalette.vue'
@@ -18,10 +18,34 @@ const pageTitle = computed(() => {
   return typeof k === 'string' ? t(k) : t('app.name')
 })
 
+// 侧边栏收起状态（持久化到 localStorage，审查 C-7 响应式）
+const NAV_KEY = 'qingjian.navCollapsed'
+const collapsed = ref(false)
+try {
+  collapsed.value = localStorage.getItem(NAV_KEY) === '1'
+} catch {
+  /* ignore */
+}
+watch(collapsed, (v) => {
+  try {
+    localStorage.setItem(NAV_KEY, v ? '1' : '0')
+  } catch {
+    /* ignore */
+  }
+})
+function toggleCollapse() {
+  collapsed.value = !collapsed.value
+}
+
+// 导航：图标在上、文字在下的圆角卡片（v0.3.0 导航改版）
 const nav = [
   { to: '/', key: 'nav.dashboard', icon: 'i-carbon-dashboard' },
   { to: '/notes', key: 'nav.notes', icon: 'i-carbon-document' },
   { to: '/todos', key: 'nav.todos', icon: 'i-carbon-task' },
+  { to: '/ledger', key: 'nav.ledger', icon: 'i-carbon-calculator' },
+  { to: '/fitness', key: 'nav.fitness', icon: 'i-carbon-run' },
+  { to: '/anniversaries', key: 'nav.anniversaries', icon: 'i-carbon-calendar' },
+  { to: '/quotes', key: 'nav.quotes', icon: 'i-carbon-bookmark' },
   { to: '/ai', key: 'nav.ai', icon: 'i-carbon-ai-status' }
 ]
 
@@ -33,54 +57,68 @@ function openPalette() {
 <template>
   <div class="flex flex-col md:flex-row h-screen bg-bg text-fg">
     <!-- 侧边栏：桌面纵向 / 移动端横向滚动顶部栏（审查 C-7 响应式） -->
-    <aside class="flex md:flex-col flex-row items-center md:items-stretch gap-2 md:gap-0 p-3 md:p-4 border-b md:border-b-0 md:border-r border-border shrink-0 overflow-x-auto md:overflow-visible">
-      <!-- Logo -->
-      <div class="flex items-center gap-3 px-1 py-2 md:mb-6 shrink-0">
-        <span class="logo-mark w-9 h-9 rounded-xl text-white grid place-items-center text-base font-bold shrink-0">青</span>
-        <div class="leading-tight hidden md:block">
-          <div class="font-bold text-base tracking-wide">{{ t('app.name') }}</div>
-          <div class="text-[11px] text-fg-faint">{{ t('app.tagline') }}</div>
+    <aside
+      class="flex md:flex-col flex-row items-center md:items-stretch gap-2 p-3 border-b md:border-b-0 md:border-r border-border shrink-0 overflow-x-auto md:overflow-visible md:transition-[width] md:duration-200"
+      :class="collapsed ? 'md:w-[78px]' : 'md:w-60'"
+    >
+      <!-- 顶部：收起按钮 + Logo -->
+      <div class="flex items-center gap-2 px-1 py-2 md:mb-4 shrink-0 w-full">
+        <button
+          class="collapse-btn grid place-items-center w-9 h-9 rounded-xl text-fg-soft hover:bg-surface-hover shrink-0"
+          @click="toggleCollapse"
+          :aria-label="t('nav.collapseAria')"
+          :title="t('nav.collapseAria')"
+        >
+          <span :class="collapsed ? 'i-carbon-chevron-right' : 'i-carbon-chevron-left'" class="text-lg" />
+        </button>
+        <div class="flex items-center gap-2 min-w-0" :class="collapsed ? 'md:hidden' : ''">
+          <span class="logo-mark w-9 h-9 rounded-xl text-white grid place-items-center text-base font-bold shrink-0">青</span>
+          <div class="leading-tight hidden md:block">
+            <div class="font-bold text-base tracking-wide truncate">{{ t('app.name') }}</div>
+            <div class="text-[11px] text-fg-faint truncate">{{ t('app.tagline') }}</div>
+          </div>
         </div>
       </div>
 
       <!-- 导航 -->
-      <nav class="flex md:flex-col flex-row gap-1 shrink-0">
+      <nav class="flex md:flex-col flex-row gap-1.5 shrink-0">
         <RouterLink
           v-for="n in nav"
           :key="n.to"
           :to="n.to"
-          class="nav-item flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-fg-soft"
+          class="nav-card flex md:flex-col flex-row items-center justify-center gap-1 px-3 py-2 rounded-xl text-fg-soft"
           active-class="nav-active"
           :aria-label="t(n.key)"
         >
-          <span :class="n.icon" class="text-lg shrink-0" />
-          <span class="hidden sm:inline">{{ t(n.key) }}</span>
+          <span :class="n.icon" class="text-xl shrink-0" />
+          <span class="text-[11px] leading-tight" :class="collapsed ? 'md:hidden' : ''">{{ t(n.key) }}</span>
         </RouterLink>
       </nav>
 
-      <!-- 底部：搜索入口 + 设置 -->
-      <div class="mt-auto flex md:flex-col flex-row items-center gap-2 md:gap-2 shrink-0 md:pt-2">
+      <!-- 底部：搜索入口 + 设置 + 版本 -->
+      <div class="mt-auto flex md:flex-col flex-row items-center gap-1.5 md:gap-1.5 shrink-0 md:pt-2">
         <button
           class="search-trigger flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-fg-faint cursor-pointer"
           @click="openPalette"
           :aria-label="t('nav.searchAria')"
+          :class="collapsed ? 'md:justify-center' : ''"
         >
-          <span class="i-carbon-search text-base" />
-          <span class="hidden sm:inline">{{ t('nav.search') }}</span>
-          <kbd class="hidden md:inline ml-auto">⌘K</kbd>
+          <span class="i-carbon-search text-base shrink-0" />
+          <span :class="collapsed ? 'md:hidden' : ''">{{ t('nav.search') }}</span>
+          <kbd class="hidden md:inline ml-auto" :class="collapsed ? 'md:hidden' : ''">⌘K</kbd>
         </button>
 
         <RouterLink
           to="/settings"
-          class="nav-item flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-fg-soft"
+          class="nav-card flex md:flex-col flex-row items-center justify-center gap-1 px-3 py-2 rounded-xl text-fg-soft"
           active-class="nav-active"
           :aria-label="t('nav.settings')"
         >
-          <span class="i-carbon-settings text-lg shrink-0" />
-          <span class="hidden sm:inline">{{ t('nav.settings') }}</span>
+          <span class="i-carbon-settings text-xl shrink-0" />
+          <span class="text-[11px] leading-tight" :class="collapsed ? 'md:hidden' : ''">{{ t('nav.settings') }}</span>
         </RouterLink>
 
-        <div class="hidden md:flex px-3 py-1.5 text-[11px] text-fg-faint items-center gap-1.5">
+        <div class="hidden md:flex px-3 py-1.5 text-[11px] text-fg-faint items-center gap-1.5" :class="collapsed ? 'md:hidden' : ''">
           <span class="w-1.5 h-1.5 rounded-full bg-brand inline-block" />
           {{ t('app.version') }}
         </div>
@@ -122,11 +160,11 @@ function openPalette() {
   box-shadow: 0 0 0 3px var(--c-brand-soft);
 }
 
-.nav-item {
+.nav-card {
   position: relative;
   transition: background-color 0.15s ease, color 0.15s ease;
 }
-.nav-item:hover {
+.nav-card:hover {
   background: var(--c-surface-hover);
   color: var(--c-fg);
 }

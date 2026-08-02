@@ -1,6 +1,6 @@
 [package]
 name = "qingjian"
-version = "0.2.0"
+version = "0.3.0"
 description = "青简 - 轻量、现代、开源、本地优先的个人工作台"
 authors = ["青简"]
 edition = "2021"

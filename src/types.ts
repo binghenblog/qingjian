@@ -43,3 +43,64 @@ export interface ChatSession {
   /** 注入给模型的本地数据上下文（作为 system 消息，不渲染为气泡，不持久化进可见历史） */
   context?: string
 }
+
+// ───────────────────────────────────────────────────────────
+// 新增模块实体（v0.3.0）：记账 / 健身 / 纪念日 / 记好句
+// ───────────────────────────────────────────────────────────
+
+export type TxType = 'income' | 'expense'
+
+/** 记账：一笔收支记录 */
+export interface Transaction {
+  id: string
+  type: TxType
+  /** 分类，如 餐饮 / 交通 / 工资 / 其他（可自定义） */
+  category: string
+  /** 金额（正数；收支方向由 type 决定） */
+  amount: number
+  /** 发生日期 YYYY-MM-DD */
+  date: string
+  note?: string
+  createdAt: number
+}
+
+/** 健身：一次锻炼记录 */
+export interface WorkoutRecord {
+  id: string
+  /** 锻炼类型，如 跑步 / 力量 / 瑜伽（可自定义） */
+  type: string
+  /** 时长（分钟） */
+  duration: number
+  /** 锻炼日期 YYYY-MM-DD */
+  date: string
+  note?: string
+  createdAt: number
+}
+
+/** 健身：一条体重记录 */
+export interface WeightRecord {
+  id: string
+  /** 体重（kg） */
+  weight: number
+  date: string
+  createdAt: number
+}
+
+/** 纪念日 */
+export interface Anniversary {
+  id: string
+  name: string
+  note?: string
+  /** 纪念日日期 YYYY-MM-DD */
+  date: string
+  createdAt: number
+}
+
+/** 记好句 */
+export interface Quote {
+  id: string
+  text: string
+  category?: string
+  date: string
+  createdAt: number
+}

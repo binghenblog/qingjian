@@ -16,6 +16,10 @@ const routes: RouteRecordRaw[] = [
   { path: '/notes', name: 'notes', component: () => import('@/views/Notes.vue'), meta: { titleKey: 'nav.notes' } },
   { path: '/todos', name: 'todos', component: () => import('@/views/Todos.vue'), meta: { titleKey: 'nav.todos' } },
   { path: '/ai', name: 'ai', component: () => import('@/views/AI.vue'), meta: { titleKey: 'nav.ai' } },
+  { path: '/ledger', name: 'ledger', component: () => import('@/views/Ledger.vue'), meta: { titleKey: 'nav.ledger' } },
+  { path: '/fitness', name: 'fitness', component: () => import('@/views/Fitness.vue'), meta: { titleKey: 'nav.fitness' } },
+  { path: '/anniversaries', name: 'anniversaries', component: () => import('@/views/Anniversaries.vue'), meta: { titleKey: 'nav.anniversaries' } },
+  { path: '/quotes', name: 'quotes', component: () => import('@/views/Quotes.vue'), meta: { titleKey: 'nav.quotes' } },
   { path: '/settings', name: 'settings', component: () => import('@/views/Settings.vue'), meta: { titleKey: 'nav.settings' } },
   // 兜底：未知路径回仪表盘（审查 L-1）
   { path: '/:pathMatch(.*)*', redirect: '/' }

@@ -1,5 +1,13 @@
 import Dexie, { type Table } from 'dexie'
-import type { NoteRecord, ChatSession } from '@/types'
+import type {
+  NoteRecord,
+  ChatSession,
+  Transaction,
+  WorkoutRecord,
+  WeightRecord,
+  Anniversary,
+  Quote
+} from '@/types'
 
 // 类型集中在 src/types.ts（审查 M-12）；此处转发导出保持旧引用兼容
 export type { NoteRecord }
@@ -23,6 +31,11 @@ export interface StorageAdapter {
 class QingjianDB extends Dexie {
   notes!: Table<NoteRecord, string>
   chats!: Table<ChatSession, string>
+  transactions!: Table<Transaction, string>
+  workouts!: Table<WorkoutRecord, string>
+  weights!: Table<WeightRecord, string>
+  anniversaries!: Table<Anniversary, string>
+  quotes!: Table<Quote, string>
   constructor() {
     super('qingjian')
     this.version(1).stores({
@@ -45,6 +58,14 @@ class QingjianDB extends Dexie {
     // v3：新增 AI 会话表（多会话 + 持久化），按 updatedAt 排序
     this.version(3).stores({
       chats: 'id, updatedAt'
+    })
+    // v4：新增 记账 / 健身 / 纪念日 / 记好句 表（v0.3.0）
+    this.version(4).stores({
+      transactions: 'id, date, type, createdAt',
+      workouts: 'id, date, createdAt',
+      weights: 'id, date, createdAt',
+      anniversaries: 'id, date, createdAt',
+      quotes: 'id, date, createdAt'
     })
   }
 }
@@ -113,6 +134,36 @@ class DexieChatStorage implements ChatStorage {
 }
 
 export const chatStorage: ChatStorage = new DexieChatStorage()
+
+// ───────────────────────────────────────────────────────────
+// 通用 CRUD 工厂（v0.3.0 新增模块共用）：列表 / 保存 / 删除 / 整体替换
+// ───────────────────────────────────────────────────────────
+interface CrudStorage<T extends { id: string }> {
+  list(): Promise<T[]>
+  save(item: T): Promise<void>
+  delete(id: string): Promise<void>
+  replaceAll(list: T[]): Promise<void>
+}
+
+function createCrud<T extends { id: string }>(table: Table<T, string>, orderBy: string): CrudStorage<T> {
+  return {
+    list: () => table.orderBy(orderBy).reverse().toArray() as Promise<T[]>,
+    save: (item: T) => table.put(item) as unknown as Promise<void>,
+    delete: (id: string) => table.delete(id) as unknown as Promise<void>,
+    replaceAll: async (list: T[]) => {
+      await db.transaction('rw', table, async () => {
+        await table.clear()
+        if (list.length) await table.bulkPut(list)
+      })
+    }
+  }
+}
+
+export const transactionStorage = createCrud<Transaction>(db.transactions, 'date')
+export const workoutStorage = createCrud<WorkoutRecord>(db.workouts, 'date')
+export const weightStorage = createCrud<WeightRecord>(db.weights, 'date')
+export const anniversaryStorage = createCrud<Anniversary>(db.anniversaries, 'date')
+export const quoteStorage = createCrud<Quote>(db.quotes, 'date')
 
 /**
  * IndexedDB 可用性探测（审查 H-8）：隐私模式 / 存储配额满 / 老旧浏览器下可能不可用。

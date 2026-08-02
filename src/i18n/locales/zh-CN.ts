@@ -7,7 +7,7 @@ export default {
     name: '青简',
     tagline: '个人工作台',
     footer: '本地优先 · 数据在你手中',
-    version: 'v0.2.0'
+    version: 'v0.3.0'
   },
   common: {
     confirm: '确定',
@@ -17,11 +17,16 @@ export default {
   nav: {
     dashboard: '今日桌面',
     notes: '笔记',
-    todos: '待办',
+    todos: '日程',
+    ledger: '记账',
+    fitness: '健身',
+    anniversaries: '纪念日',
+    quotes: '记好句',
     ai: 'AI 助手',
     settings: '设置',
     search: '快速搜索',
-    searchAria: '快速搜索（Ctrl/Cmd + K）'
+    searchAria: '快速搜索（Ctrl/Cmd + K）',
+    collapseAria: '收起 / 展开侧边栏'
   },
   dashboard: {
     greetingNight: '夜深了',
@@ -211,6 +216,12 @@ export default {
     noteKind: '笔记',
     noResult: '没有匹配的结果'
   },
+  // 新增模块命名空间（占位标题，详细文案在各模块阶段增量抽取）
+  ledger: { title: '记账' },
+  fitness: { title: '健身' },
+  anniversary: { title: '纪念日' },
+  quote: { title: '记好句' },
+  schedule: { title: '日程' },
   // 服务层 / Store 层错误文案（审查 H-14）：这些层无组件上下文，经 i18n.global.t 渲染
   errors: {
     aiUrlCloud: '请先在设置中填写云端接口地址',

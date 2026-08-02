@@ -5,7 +5,7 @@ export default {
     name: 'QingJian',
     tagline: 'Personal Workbench',
     footer: 'Local-first · Your data stays with you',
-    version: 'v0.2.0'
+    version: 'v0.3.0'
   },
   common: {
     confirm: 'Confirm',
@@ -15,11 +15,16 @@ export default {
   nav: {
     dashboard: 'Today',
     notes: 'Notes',
-    todos: 'Tasks',
+    todos: 'Schedule',
+    ledger: 'Ledger',
+    fitness: 'Fitness',
+    anniversaries: 'Anniversaries',
+    quotes: 'Quotes',
     ai: 'AI Assistant',
     settings: 'Settings',
     search: 'Quick search',
-    searchAria: 'Quick search (Ctrl/Cmd + K)'
+    searchAria: 'Quick search (Ctrl/Cmd + K)',
+    collapseAria: 'Collapse / expand sidebar'
   },
   dashboard: {
     greetingNight: 'Late night',
@@ -209,6 +214,12 @@ export default {
     noteKind: 'Note',
     noResult: 'No matching results'
   },
+  // New module namespaces (placeholder titles; detailed copy added per module phase)
+  ledger: { title: 'Ledger' },
+  fitness: { title: 'Fitness' },
+  anniversary: { title: 'Anniversaries' },
+  quote: { title: 'Quotes' },
+  schedule: { title: 'Schedule' },
   errors: {
     aiUrlCloud: 'Set the cloud endpoint in Settings first',
     aiUrlLocal: 'Set the Ollama endpoint in Settings first',

@@ -10,7 +10,7 @@
 
 <p align="center">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-blue.svg" />
-  <img alt="Version" src="https://img.shields.io/badge/version-0.2.0-orange.svg" />
+  <img alt="Version" src="https://img.shields.io/badge/version-0.3.0-orange.svg" />
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS%20%7C%20Android-2ea043.svg" />
   <img alt="Stack" src="https://img.shields.io/badge/stack-Vue%203%20%2B%20Tauri%20v2-42b883.svg" />
 </p>

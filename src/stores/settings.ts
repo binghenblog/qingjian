@@ -16,6 +16,10 @@ interface SettingsState {
   aiKeyRemember: boolean
   /** 界面语言（审查 L-38 多语种） */
   locale: string
+  /** 记账页是否显示「本周 / 本月」收支汇总（默认隐藏，由用户开关控制） */
+  ledgerShowSummary: boolean
+  /** 侧边栏是否收起（持久化到 localStorage） */
+  navCollapsed: boolean
 }
 
 function load(): SettingsState {
@@ -25,7 +29,9 @@ function load(): SettingsState {
     aiBaseUrl: 'http://127.0.0.1:11434',
     aiModel: 'llama3',
     aiKeyRemember: false,
-    locale: 'zh-CN'
+    locale: 'zh-CN',
+    ledgerShowSummary: false,
+    navCollapsed: false
   }
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -89,6 +95,8 @@ export const useSettingsStore = defineStore('settings', () => {
   const aiKeyRemember = ref(s.aiKeyRemember)
   const aiApiKey = ref(loadKey(s.aiKeyRemember))
   const locale = ref(s.locale)
+  const ledgerShowSummary = ref(s.ledgerShowSummary)
+  const navCollapsed = ref(s.navCollapsed)
 
   // 语言切换：写入 i18n 全局 locale，界面即时更新（审查 L-38）
   watch(locale, (code) => {
@@ -97,7 +105,7 @@ export const useSettingsStore = defineStore('settings', () => {
 
   // 主设置（不含 Key）：写盘加 200ms 防抖，避免每个 ref 变化都立即同步 localStorage（审查 M-9）
   let settingsTimer: number | undefined
-  watch([userName, aiProvider, aiBaseUrl, aiModel, aiKeyRemember, locale], () => {
+  watch([userName, aiProvider, aiBaseUrl, aiModel, aiKeyRemember, locale, ledgerShowSummary, navCollapsed], () => {
     clearTimeout(settingsTimer)
     settingsTimer = window.setTimeout(() => {
       try {
@@ -109,7 +117,9 @@ export const useSettingsStore = defineStore('settings', () => {
             aiBaseUrl: aiBaseUrl.value,
             aiModel: aiModel.value,
             aiKeyRemember: aiKeyRemember.value,
-            locale: locale.value
+            locale: locale.value,
+            ledgerShowSummary: ledgerShowSummary.value,
+            navCollapsed: navCollapsed.value
           })
         )
       } catch {
@@ -121,5 +131,5 @@ export const useSettingsStore = defineStore('settings', () => {
   // Key 单独持久化，跟随「记住」开关迁移存储位置
   watch([aiApiKey, aiKeyRemember], () => persistKey(aiApiKey.value, aiKeyRemember.value))
 
-  return { userName, aiProvider, aiBaseUrl, aiApiKey, aiModel, aiKeyRemember, locale }
+  return { userName, aiProvider, aiBaseUrl, aiApiKey, aiModel, aiKeyRemember, locale, ledgerShowSummary, navCollapsed }
 })
