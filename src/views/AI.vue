@@ -27,8 +27,6 @@ const channelLabel = computed(() => {
   return `${type} · ${settings.aiModel}`
 })
 
-const needsKey = computed(() => settings.aiProvider === 'cloud' && !settings.aiApiKey.trim())
-
 async function scrollBottom() {
   await nextTick()
   const el = scrollEl.value
@@ -209,7 +207,7 @@ onMounted(() => {
         <textarea
           v-model="input"
           @keydown.enter.exact.prevent="submit"
-          :placeholder="needsKey ? t('ai.placeholderNeedsKey') : t('ai.placeholder')"
+          :placeholder="ai.needsKey() ? t('ai.placeholderNeedsKey') : t('ai.placeholder')"
           rows="1"
           class="flex-1 px-3 py-2 bg-transparent border-none outline-none text-sm text-fg placeholder:text-fg-faint resize-none max-h-32 leading-relaxed"
         />
@@ -226,7 +224,7 @@ onMounted(() => {
         <button
           v-else
           @click="submit"
-          :disabled="!input.trim() || needsKey"
+          :disabled="!input.trim() || ai.needsKey()"
           class="btn-primary w-9 h-9 grid place-items-center rounded-xl shrink-0"
           :aria-label="t('ai.send')"
         >

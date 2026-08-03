@@ -232,6 +232,7 @@ export const useAiStore = defineStore('ai', () => {
     loaded,
     isStreaming,
     status,
+    needsKey,
     load,
     selectSession,
     addSession,

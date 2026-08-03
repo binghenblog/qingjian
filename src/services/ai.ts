@@ -127,7 +127,10 @@ function isInternalIpLiteral(host: string): boolean {
  *   （本地网关 127.0.0.1/localhost 在 local(Ollama) 模式仍允许，便于开发期本地代理；
  *    cloud 模式仅放行公网/localhost 域名，内网字面 IP 一律拦截作为纵深防御）
  */
-function assertSafeUrl(raw: string, kind: 'local' | 'cloud'): string {
+/** 校验并归一化 AI 接口地址（审查 M-22 协议白名单 / M-23 SSRF 防护）。
+ * 导出供安全单测覆盖绕过向量（十进制 / 十六进制 / IPv6-mapped 等）。
+ */
+export function assertSafeUrl(raw: string, kind: 'local' | 'cloud'): string {
   const base = raw.trim()
   if (!base) {
     throw new Error(le(kind === 'cloud' ? 'errors.aiUrlCloud' : 'errors.aiUrlLocal'))
