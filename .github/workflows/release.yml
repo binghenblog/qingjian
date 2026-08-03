@@ -89,4 +89,4 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: '青简 ${{ github.ref_name }}'
-          args: android build --target aarch64-linux-android
+          args: --target aarch64-linux-android
