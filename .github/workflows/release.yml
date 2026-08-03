@@ -49,6 +49,9 @@ jobs:
   #   KEY_ALIAS / KEY_PASSWORD / KEYSTORE_BASE64（可选；未配置则用 debug key 构建）
   android:
     runs-on: ubuntu-latest
+    # secrets 上下文不能在 if: 中直接引用，故先在 job 级 env 计算存在性，再于 step 的 if 中引用
+    env:
+      KEYSTORE_SET: ${{ secrets.KEYSTORE_BASE64 != '' }}
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v4
@@ -72,7 +75,7 @@ jobs:
       - name: Install Android SDK components
         run: sdkmanager "platforms;android-34" "build-tools;34.0.0" "ndk;25.2.9519653"
       - name: Decode signing keystore
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        if: env.KEYSTORE_SET == 'true'
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android.keystore
       - run: pnpm install --frozen-lockfile
       - name: Tauri Android build
