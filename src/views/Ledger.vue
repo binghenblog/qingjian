@@ -31,9 +31,10 @@ const form = ref({
 })
 const categories = computed(() => TX_CATEGORIES[form.value.type])
 
+/** 切换收支类型：分类改为由 chips 重新点选（预设分类随类型切换） */
 function switchType(type: TxType) {
   form.value.type = type
-  if (form.value.category && !TX_CATEGORIES[type].includes(form.value.category)) {
+  if (!TX_CATEGORIES[type].includes(form.value.category)) {
     form.value.category = ''
   }
 }
@@ -138,15 +139,18 @@ function sign(type: TxType): string {
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <label class="field">
           <span class="field-label">{{ t('ledger.category') }}</span>
-          <input
-            v-model="form.category"
-            list="ledger-cats"
-            class="input-modern w-full px-3 py-2 text-sm"
-            :placeholder="t('ledger.categoryPlaceholder')"
-          />
-          <datalist id="ledger-cats">
-            <option v-for="c in categories" :key="c" :value="c" />
-          </datalist>
+          <div class="flex flex-wrap gap-1.5 pt-0.5">
+            <button
+              v-for="c in categories"
+              :key="c"
+              type="button"
+              class="cat-chip px-2.5 py-1 text-xs rounded-full cursor-pointer"
+              :class="form.category === c ? 'cat-chip-active' : ''"
+              @click="form.category = c"
+            >
+              {{ c }}
+            </button>
+          </div>
         </label>
         <label class="field">
           <span class="field-label">{{ t('ledger.amount') }}</span>
@@ -246,6 +250,27 @@ function sign(type: TxType): string {
   box-shadow: var(--shadow-sm);
 }
 .dark .seg-active {
+  color: var(--c-brand);
+}
+
+/* 分类 chips（预设 + 切换选中态） */
+.cat-chip {
+  background: var(--c-bg);
+  border: 1px solid var(--c-border);
+  color: var(--c-fg-soft);
+  transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+}
+.cat-chip:hover {
+  border-color: var(--c-brand);
+  color: var(--c-fg);
+}
+.cat-chip-active {
+  background: var(--c-brand-soft);
+  border-color: var(--c-brand);
+  color: var(--c-brand-strong);
+  font-weight: 600;
+}
+.dark .cat-chip-active {
   color: var(--c-brand);
 }
 </style>

@@ -122,6 +122,13 @@ function highlightTitle(title: string) {
     : escapeHtml(title || t('notes.untitled'))
 }
 
+/** 内容预览：去掉 Markdown 符号后截断（审查 M-26：分步清洗消除歧义，避免前序替换改变后续匹配） */
+function previewText(content: string): string {
+  let s = content.replace(/```[\s\S]*?```/g, ' ')
+  s = s.replace(/`/g, ' ').replace(/^[>#*-]+ ?/gm, '').replace(/!?\[[^\]]*\]\([^)]*\)/g, '')
+  return s.replace(/\s+/g, ' ').slice(0, 40) || t('notes.blankNote')
+}
+
 const rendered = computed(() => (store.current ? md.render(store.current.content || '') : ''))
 
 /**
@@ -394,7 +401,7 @@ onMounted(() => {
             v-html="snippetMap[n.id]"
           />
           <div v-else class="text-xs text-fg-faint mt-0.5 truncate">
-            {{ n.content.replace(/[#>*`\-]/g, '').slice(0, 40) || t('notes.blankNote') }}
+            {{ previewText(n.content) }}
           </div>
           <div class="flex flex-wrap items-center gap-1 mt-1.5">
             <span v-if="searching && n.folder" class="mini-folder">

@@ -13,7 +13,8 @@ export default {
     confirm: '确定',
     cancel: '取消',
     delete: '删除',
-    undo: '撤销'
+    undo: '撤销',
+    add: '添加'
   },
   nav: {
     dashboard: '今日桌面',

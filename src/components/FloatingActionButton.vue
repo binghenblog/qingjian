@@ -1,12 +1,16 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 defineProps<{ ariaLabel?: string }>()
 const emit = defineEmits<{ (e: 'click'): void }>()
+
+const { t } = useI18n()
 </script>
 
 <template>
   <button
     class="fab fixed bottom-6 right-6 z-30 w-14 h-14 rounded-full bg-brand text-white grid place-items-center shadow-lg hover:scale-105 active:scale-95 transition"
-    :aria-label="ariaLabel || '新增'"
+    :aria-label="ariaLabel || t('common.add')"
     @click="emit('click')"
   >
     <span class="i-carbon-add text-2xl" />

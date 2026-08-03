@@ -159,6 +159,15 @@ export function validateBackup(data: unknown): string | null {
       return le('errors.backupNoteCorrupt')
     }
   }
+  // v0.3.0 新增实体逐元素校验：同样要求 id 为字符串，避免 IndexedDB 主键缺失写入异常（审查 M-5 补全）
+  for (const k of ['transactions', 'workouts', 'weights', 'anniversaries', 'quotes'] as const) {
+    if (!b[k]) continue
+    for (const item of b[k] as unknown[]) {
+      if (!item || typeof item !== 'object' || typeof (item as Record<string, unknown>).id !== 'string') {
+        return le('errors.backupNoteCorrupt')
+      }
+    }
+  }
   return null
 }
 

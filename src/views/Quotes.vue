@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, nextTick, watch } from 'vue'
+import { onMounted, onUnmounted, ref, nextTick, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useQuotesStore, QUOTE_CATEGORIES } from '@/stores/quotes'
 import { useToast } from '@/composables/useToast'
@@ -23,6 +23,19 @@ watch(showForm, (v) => { if (v) nextTick(() => textInput.value?.focus()) })
 onMounted(() => {
   if (!store.loaded) store.load()
 })
+
+/** Esc 全局关闭表单：焦点不在表单内（如刚点 FAB）时同样生效，与 ConfirmDialog 一致（审查 L-11） */
+function onKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && showForm.value) {
+    e.preventDefault()
+    showForm.value = false
+  }
+}
+watch(showForm, (v) => {
+  if (v) window.addEventListener('keydown', onKeydown)
+  else window.removeEventListener('keydown', onKeydown)
+})
+onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 
 async function submit() {
   const text = draftText.value.trim()
@@ -61,7 +74,7 @@ async function removeItem(id: string) {
     </div>
 
     <!-- 添加表单（FAB 唤起） -->
-    <section v-if="showForm" class="rounded-2xl p-5 space-y-4 bg-bg border border-brand/20" @keydown.esc="showForm = false">
+    <section v-if="showForm" class="rounded-2xl p-5 space-y-4 bg-bg border border-brand/20">
       <div class="font-semibold text-sm">{{ t('quote.add') }}</div>
       <div class="space-y-3">
         <label class="block">

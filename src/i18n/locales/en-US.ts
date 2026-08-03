@@ -11,7 +11,8 @@ export default {
     confirm: 'Confirm',
     cancel: 'Cancel',
     delete: 'Delete',
-    undo: 'Undo'
+    undo: 'Undo',
+    add: 'Add'
   },
   nav: {
     dashboard: 'Today',

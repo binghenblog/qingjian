@@ -155,7 +155,7 @@ function addProgress() {
               @click="store.toggle(todo.id)"
               role="checkbox"
               :aria-checked="store.isDone(todo) ? 'true' : 'false'"
-              :aria-label="`完成任务 ${todo.title}`"
+              :aria-label="t('todos.completeTask', { title: todo.title })"
               class="check w-5 h-5 rounded-full flex items-center justify-center shrink-0 cursor-pointer"
               :class="{ 'check-done': store.isDone(todo) }"
             >
@@ -203,7 +203,7 @@ function addProgress() {
                 @click="store.toggle(todo.id)"
                 role="checkbox"
                 :aria-checked="store.isDone(todo) ? 'true' : 'false'"
-                :aria-label="`完成任务 ${todo.title}`"
+                :aria-label="t('todos.completeTask', { title: todo.title })"
                 class="check w-5 h-5 rounded-full flex items-center justify-center shrink-0 cursor-pointer"
                 :class="{ 'check-done': store.isDone(todo) }"
               >
