@@ -71,6 +71,7 @@ jobs:
           distribution: temurin
           java-version: 17
       - name: Set up Android SDK
+        id: setup-android
         uses: android-actions/setup-android@v3
       - name: Install Android SDK components
         run: sdkmanager "platforms;android-34" "build-tools;34.0.0" "ndk;25.2.9519653"
@@ -82,7 +83,8 @@ jobs:
         uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/25.2.9519653
+          NDK_HOME: ${{ steps.setup-android.outputs.android-home }}/ndk/25.2.9519653
+          ANDROID_NDK_HOME: ${{ steps.setup-android.outputs.android-home }}/ndk/25.2.9519653
           # 签名（可选，未配置 Secrets 时用 debug key 构建）
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
