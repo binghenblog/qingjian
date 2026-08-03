@@ -75,6 +75,17 @@ jobs:
         uses: android-actions/setup-android@v3
       - name: Install Android SDK components
         run: sdkmanager "platforms;android-34" "build-tools;34.0.0" "ndk;25.2.9519653"
+      - name: Link NDK clang into PATH
+        # cc-rs 按 aarch64-linux-android-clang 这个名字在 PATH 上找编译器，
+        # 而 NDK 的 clang 实际叫 aarch64-linux-android34-clang（带 API 版本号），
+        # 故建立不带版本号的软链并加入 PATH（同时供 Rust 标准库链接器使用）。
+        run: |
+          NDK_BIN="${{ steps.setup-android.outputs.android-home }}/ndk/25.2.9519653/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          mkdir -p "$HOME/ndk-bin"
+          ln -sf "$NDK_BIN/aarch64-linux-android34-clang" "$HOME/ndk-bin/aarch64-linux-android-clang"
+          ln -sf "$NDK_BIN/aarch64-linux-android34-clang++" "$HOME/ndk-bin/aarch64-linux-android-clang++"
+          ln -sf "$NDK_BIN/llvm-ar" "$HOME/ndk-bin/aarch64-linux-android-ar"
+          echo "$HOME/ndk-bin" >> "$GITHUB_PATH"
       - name: Decode signing keystore
         if: env.KEYSTORE_SET == 'true'
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android.keystore
@@ -85,6 +96,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NDK_HOME: ${{ steps.setup-android.outputs.android-home }}/ndk/25.2.9519653
           ANDROID_NDK_HOME: ${{ steps.setup-android.outputs.android-home }}/ndk/25.2.9519653
+          # cc-rs / Rust 交叉编译工具链需要显式指明 NDK clang 路径（双保险，避免找不到 aarch64-linux-android-clang）
+          CC_aarch64_linux_android: ${{ steps.setup-android.outputs.android-home }}/ndk/25.2.9519653/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android34-clang
+          CXX_aarch64_linux_android: ${{ steps.setup-android.outputs.android-home }}/ndk/25.2.9519653/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android34-clang++
+          AR_aarch64_linux_android: ${{ steps.setup-android.outputs.android-home }}/ndk/25.2.9519653/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
           # 签名（可选，未配置 Secrets 时用 debug key 构建）
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
