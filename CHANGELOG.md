@@ -4,12 +4,15 @@ All notable changes to 青简 (QingJian) are documented here.
 
 The project adheres to [Semantic Versioning](https://semver.org/).
 
-## [0.3.1] - 2026-08-03
+## [0.4.0] - 2026-08-03
 
-v0.3.1 是修复版：核心是修复 Android APK 交叉编译链接失败（经 Gradle 调起 cargo 时 linker 回落宿主 gcc），并同步对齐构建依赖版本；同时完成一轮无障碍 / i18n / 数据健壮性修复，补充 AI 服务安全单测。
+v0.4.0 是修复版：核心是修复 Android APK 交叉编译链接失败（经 Gradle 调起 cargo 时 linker 回落宿主 gcc）、并让 APK 可正常安装（apksigner 签名）、修复桌面端 CSP 运行期 JS 错误；同时完成一轮无障碍 / i18n / 数据健壮性修复，补充 AI 服务安全单测。
 
 ### Fixed
 - **Android APK 交叉编译链接（CI）**：Tauri 的 android 构建经 Gradle 插件调起 cargo（`pnpm tauri android android-studio-script`），Gradle daemon 不继承 CI 步骤的 `CARGO_TARGET_*_LINKER` 环境变量，导致 rustc 链接 cdylib 时回落宿主 `gcc(cc)`、缺 Android sysroot 而报 `unable to find library -landroid/-llog/-lunwind`。改为仓库根 `.cargo/config.toml` 为 4 个 Android target 指定 NDK clang 作 linker（armv7 用 NDK 侧名 `armv7a-linux-androideabi-clang`），cargo 无论从哪条路径被调用都会读取；`release.yml` 软链步骤覆盖全部 4 个 ABI，并移除已失效的 `CARGO_TARGET_*_LINKER` env。
+- **Android 出包改走 gradle**：`tauri build --target aarch64-linux-android` 在 bundle 阶段报 `Native android bundles not yet supported`，改为 `pnpm tauri android build --apk --ci -t aarch64`。
+- **APK 签名（可安装）**：未签名 APK 无法安装（报「包似乎无效 / 缺开发者证书」）。配置 `KEYSTORE_BASE64` / `KEY_ALIAS` / `KEY_PASSWORD` Secrets 时，用 `apksigner` 对产出 APK 签名后上传；未配置时保持 debug key 签名。
+- **CSP 运行期 JS 错误**：vue-i18n 9 用 `new Function` 编译消息模板，CSP `script-src` 未放行 `unsafe-eval` 导致 exe 报错，已放行（本地优先桌面应用，风险可控）。
 - **SDK 平台版本对齐（CI）**：gen/android 工程 `compileSdk=36`，CI 原装 `android-34` 会在 AGP 阶段报 `failed to find target SDK 36`，改为 `platforms;android-36` + `build-tools;36.0.0`。
 - **无障碍 / i18n 一致性**：Dashboard 待办完成 `aria-label` 改走 i18n；FAB 缺省 `aria-label` 用 `common.add`；纪念日/好句表单 Esc 改全局监听，焦点在表单外也能关闭。
 - **记账分类交互**：由可手输的 datalist 改为预设 chips 单选，与 `TX_CATEGORIES` 预设一致，避免自由分类无法再编辑。
@@ -52,6 +55,6 @@ v0.3.0 是继 v0.2.0 之后的功能与健壮性大版本：新增多个生活�
 - 全站 UI 文案经 vue-i18n 渲染。
 - 多轮安全/稳定性审查修复（Critical/High/Medium/Low）。
 
-[0.3.1]: https://github.com/binghenblog/qingjian/releases/tag/v0.3.1
+[0.4.0]: https://github.com/binghenblog/qingjian/releases/tag/v0.4.0
 [0.3.0]: https://github.com/binghenblog/qingjian/releases/tag/v0.3.0
 [0.2.0]: https://github.com/binghenblog/qingjian/releases/tag/v0.2.0

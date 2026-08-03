@@ -7,7 +7,7 @@ export default {
     name: '青简',
     tagline: '个人工作台',
     footer: '本地优先 · 数据在你手中',
-    version: 'v0.3.1'
+    version: 'v0.4.0'
   },
   common: {
     confirm: '确定',
