@@ -38,8 +38,8 @@ export const useFitnessStore = defineStore('fitness', () => {
     loaded.value = true
   }
 
-  async function addWorkout(input: Omit<WorkoutRecord, 'id' | 'createdAt'>) {
-    const w: WorkoutRecord = { ...input, id: crypto.randomUUID(), createdAt: Date.now() }
+  async function addWorkout(input: Omit<WorkoutRecord, 'id' | 'createdAt' | 'updatedAt'>) {
+    const w: WorkoutRecord = { ...input, id: crypto.randomUUID(), createdAt: Date.now(), updatedAt: Date.now() }
     await workoutStorage.save(w)
     await load()
   }
@@ -47,8 +47,8 @@ export const useFitnessStore = defineStore('fitness', () => {
     await workoutStorage.delete(id)
     await load()
   }
-  async function addWeight(input: Omit<WeightRecord, 'id' | 'createdAt'>) {
-    const w: WeightRecord = { ...input, id: crypto.randomUUID(), createdAt: Date.now() }
+  async function addWeight(input: Omit<WeightRecord, 'id' | 'createdAt' | 'updatedAt'>) {
+    const w: WeightRecord = { ...input, id: crypto.randomUUID(), createdAt: Date.now(), updatedAt: Date.now() }
     await weightStorage.save(w)
     await load()
   }

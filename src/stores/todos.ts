@@ -313,7 +313,8 @@ export const useTodoStore = defineStore('todos', () => {
       category,
       dueDate,
       doneDates: category === DAILY_CATEGORY ? [] : undefined,
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      updatedAt: Date.now()
     })
   }
 

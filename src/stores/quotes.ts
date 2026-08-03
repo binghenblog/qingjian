@@ -15,8 +15,8 @@ export const useQuotesStore = defineStore('quotes', () => {
     loaded.value = true
   }
 
-  async function add(input: Omit<Quote, 'id' | 'createdAt'>) {
-    const q: Quote = { ...input, id: crypto.randomUUID(), createdAt: Date.now() }
+  async function add(input: Omit<Quote, 'id' | 'createdAt' | 'updatedAt'>) {
+    const q: Quote = { ...input, id: crypto.randomUUID(), createdAt: Date.now(), updatedAt: Date.now() }
     await quoteStorage.save(q)
     await load()
   }

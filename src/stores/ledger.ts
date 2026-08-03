@@ -30,8 +30,8 @@ export const useLedgerStore = defineStore('ledger', () => {
     loaded.value = true
   }
 
-  async function add(input: Omit<Transaction, 'id' | 'createdAt'>) {
-    const t: Transaction = { ...input, id: crypto.randomUUID(), createdAt: Date.now() }
+  async function add(input: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) {
+    const t: Transaction = { ...input, id: crypto.randomUUID(), createdAt: Date.now(), updatedAt: Date.now() }
     await transactionStorage.save(t)
     await load()
   }

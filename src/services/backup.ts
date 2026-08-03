@@ -20,6 +20,7 @@ import type {
 import { le } from '@/i18n/errors'
 import { useTodoStore } from '@/stores/todos'
 import { useSettingsStore } from '@/stores/settings'
+import { useAiStore } from '@/stores/ai'
 
 /**
  * 青简全量备份 / 恢复（M4）
@@ -266,11 +267,17 @@ export async function importBackup(backup: BackupFile, mode: ImportMode): Promis
     // merge：按 id 合并，取时间戳较新者（与笔记 merge 对齐，审查 M-3）
     const curTodos = readJson<TodoRecord[]>(LS_KEYS.todos, [])
     const byId = new Map<string, TodoRecord>(curTodos.map((t) => [t.id, t]))
-    const ts = (t: TodoRecord) =>
-      Math.max(
+    // 时间戳：取创建/完成/打卡（doneDates 最大日期）三者较新者（审查 M-6：打卡记录不再被丢弃）
+    const ts = (t: TodoRecord) => {
+      const base = Math.max(
         numTs(t.createdAt),
         typeof t.completedAt === 'number' && Number.isFinite(t.completedAt) ? t.completedAt : 0
       )
+      const done = Array.isArray(t.doneDates)
+        ? t.doneDates.reduce((m, d) => Math.max(m, Date.parse(d) || 0), 0)
+        : 0
+      return Math.max(base, done)
+    }
     for (const inc of backup.todos.map(sanitizeTodo)) {
       const old = byId.get(inc.id)
       if (!old || ts(inc) >= ts(old)) byId.set(inc.id, inc)
@@ -295,9 +302,15 @@ export async function importBackup(backup: BackupFile, mode: ImportMode): Promis
     if (mode === 'replace') {
       await svc.replaceAll(items)
     } else {
-      // merge：按 id 覆盖（bulkPut 语义）—— 同 id 的备份记录覆盖本地，
-      // 避免「同 id 但内容已更新」的记录被静默丢弃（审查 H-2）
-      for (const it of items) await svc.save(it)
+      // merge：按 id 比较更新时间，本地较新则保留本地，避免旧备份覆盖本地更新
+      // （审查 M-5 / H-2 反向回归：新模块实体已加 updatedAt，与 notes/todos 对齐）
+      const existing = new Map((await svc.list()).map((x) => [x.id, x]))
+      const tsGet = (x: T) => (x as unknown as { updatedAt?: number }).updatedAt ?? 0
+      const toSave = items.filter((it) => {
+        const old = existing.get(it.id)
+        return !old || tsGet(it) >= tsGet(old)
+      })
+      for (const it of toSave) await svc.save(it)
     }
     return items.length
   }
@@ -307,6 +320,14 @@ export async function importBackup(backup: BackupFile, mode: ImportMode): Promis
   const cntWeights = await importTable(backup.weights, weightStorage)
   const cntAnniversaries = await importTable(backup.anniversaries, anniversaryStorage)
   const cntQuotes = await importTable(backup.quotes, quoteStorage)
+
+  // 备份导入后刷新 AI 会话（审查 M-4）：ai.load() 有「已加载则早返回」且无 reload，
+  // 导入的 chats 在重启前 UI 不可见；此处强制重新加载
+  try {
+    await useAiStore().reload()
+  } catch {
+    /* ignore */
+  }
 
   return {
     notes: incomingNotes.length,

@@ -21,6 +21,8 @@ export interface TodoRecord {
   /** 普通任务完成时间戳（用于按日统计） */
   completedAt?: number
   createdAt: number
+  /** 最后更新时间戳（备份 merge 取较新者，审查 M-5） */
+  updatedAt: number
 }
 
 export interface NoteRecord {
@@ -64,6 +66,8 @@ export interface Transaction {
   date: string
   note?: string
   createdAt: number
+  /** 最后更新时间戳（备份 merge 取较新者，审查 M-5） */
+  updatedAt: number
 }
 
 /** 健身：一次锻炼记录 */
@@ -77,6 +81,8 @@ export interface WorkoutRecord {
   date: string
   note?: string
   createdAt: number
+  /** 最后更新时间戳（备份 merge 取较新者，审查 M-5） */
+  updatedAt: number
 }
 
 /** 健身：一条体重记录 */
@@ -86,6 +92,8 @@ export interface WeightRecord {
   weight: number
   date: string
   createdAt: number
+  /** 最后更新时间戳（备份 merge 取较新者，审查 M-5） */
+  updatedAt: number
 }
 
 /** 纪念日 */
@@ -96,6 +104,8 @@ export interface Anniversary {
   /** 纪念日日期 YYYY-MM-DD */
   date: string
   createdAt: number
+  /** 最后更新时间戳（备份 merge 取较新者，审查 M-5） */
+  updatedAt: number
 }
 
 /** 记好句 */
@@ -105,4 +115,6 @@ export interface Quote {
   category?: string
   date: string
   createdAt: number
+  /** 最后更新时间戳（备份 merge 取较新者，审查 M-5） */
+  updatedAt: number
 }

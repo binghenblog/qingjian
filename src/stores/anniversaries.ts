@@ -17,8 +17,8 @@ export const useAnniversariesStore = defineStore('anniversaries', () => {
     loaded.value = true
   }
 
-  async function add(input: Omit<Anniversary, 'id' | 'createdAt'>) {
-    const a: Anniversary = { ...input, id: crypto.randomUUID(), createdAt: Date.now() }
+  async function add(input: Omit<Anniversary, 'id' | 'createdAt' | 'updatedAt'>) {
+    const a: Anniversary = { ...input, id: crypto.randomUUID(), createdAt: Date.now(), updatedAt: Date.now() }
     await anniversaryStorage.save(a)
     await load()
   }
