@@ -74,10 +74,58 @@ const BLOCKED_CLOUD_HOSTS = ['169.254.169.254', '0.0.0.0']
 const BLOCKED_CLOUD_PREFIX = ['169.254.', 'fe80.', '::']
 
 /**
+ * 判断字面量 IP 是否为内网/保留地址（审查 L-13 防御性加固，仅云模式 Web 侧）。
+ * 覆盖：loopback(127/::1)、链路本地(fe80/169.254)、RFC1918(10/172.16-31/192.168)、
+ * 唯一本地(fc/fd)、未指定(::)、组播/保留(224+)。仅对字面 IP 生效；
+ * 域名无 DNS 解析能力，交给 Rust 后端权威判定。
+ * 注意：local(Ollama) 模式刻意豁免，因其本就运行在本地/内网。
+ */
+function isInternalIpLiteral(host: string): boolean {
+  const h = host.toLowerCase()
+  // IPv4
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(h)
+  if (m) {
+    const a = m.slice(1).map(Number)
+    if (a.some((x) => x > 255)) return false
+    const [o1, o2] = a
+    if (o1 === 10) return true
+    if (o1 === 172 && o2 >= 16 && o2 <= 31) return true
+    if (o1 === 192 && o2 === 168) return true
+    if (o1 === 127) return true
+    if (o1 === 0) return true
+    if (o1 === 169 && o2 === 254) return true
+    if (o1 >= 224) return true
+    return false
+  }
+  // IPv6 / IPv4-mapped
+  if (h.includes(':')) {
+    if (h === '::1' || h === '::') return true
+    if (h.startsWith('fe80') || h.startsWith('fc') || h.startsWith('fd')) return true
+    const mm = /^::ffff:(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(h)
+    if (mm) {
+      const a = mm.slice(1).map(Number)
+      if (a.some((x) => x > 255)) return false
+      const [o1, o2] = a
+      if (
+        o1 === 10 ||
+        (o1 === 172 && o2 >= 16 && o2 <= 31) ||
+        (o1 === 192 && o2 === 168) ||
+        o1 === 127 ||
+        (o1 === 169 && o2 === 254)
+      )
+        return true
+    }
+    return false
+  }
+  return false
+}
+
+/**
  * 校验并归一化 AI 接口地址（审查 M-22 协议白名单 / M-23 SSRF 防护）。
  * - 必须 http/https 协议
- * - 云端模式拦截链路本地/元数据地址（如 169.254.169.254），避免凭证外泄
- *   （本地网关 127.0.0.1/localhost 仍允许，便于开发期本地代理）
+ * - 云端模式拦截链路本地/元数据/内网地址（审查 L-13 扩展），避免凭证外泄
+ *   （本地网关 127.0.0.1/localhost 在 local(Ollama) 模式仍允许，便于开发期本地代理；
+ *    cloud 模式仅放行公网/localhost 域名，内网字面 IP 一律拦截作为纵深防御）
  */
 function assertSafeUrl(raw: string, kind: 'local' | 'cloud'): string {
   const base = raw.trim()
@@ -97,7 +145,8 @@ function assertSafeUrl(raw: string, kind: 'local' | 'cloud'): string {
     const host = url.hostname.toLowerCase()
     const blocked =
       BLOCKED_CLOUD_HOSTS.includes(host) ||
-      BLOCKED_CLOUD_PREFIX.some((p) => host.startsWith(p))
+      BLOCKED_CLOUD_PREFIX.some((p) => host.startsWith(p)) ||
+      isInternalIpLiteral(host)
     if (blocked) throw new Error(le('errors.aiBlockedHost'))
   }
   return base.replace(/\/$/, '')

@@ -66,7 +66,7 @@ async function onDelete(session: ChatSession) {
     }))
   )
     return
-  ai.deleteSession(session.id)
+  ai.deleteSession(session.id).catch(() => {})
 }
 
 function startRename(session: ChatSession) {

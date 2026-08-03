@@ -301,7 +301,7 @@ export default {
   anniversary: {
     title: 'Anniversaries',
     add: 'Add anniversary',
-    count: '',
+    count: 'items',
     name: 'Name',
     namePlaceholder: 'Anniversary name',
     note: 'Note',
@@ -323,7 +323,7 @@ export default {
   quote: {
     title: 'Quotes',
     add: 'Add quote',
-    count: '',
+    count: 'items',
     text: 'Quote',
     textPlaceholder: 'Write down a line that moved you…',
     category: 'Category',

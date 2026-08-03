@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, nextTick, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useQuotesStore } from '@/stores/quotes'
+import { useQuotesStore, QUOTE_CATEGORIES } from '@/stores/quotes'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import FloatingActionButton from '@/components/FloatingActionButton.vue'
@@ -16,6 +16,9 @@ const showForm = ref(false)
 const draftText = ref('')
 const draftCategory = ref('')
 const draftDate = ref(dateKey())
+const textInput = ref<HTMLTextAreaElement | null>(null)
+// 表单展开后聚焦首个输入框（审查 L-10）
+watch(showForm, (v) => { if (v) nextTick(() => textInput.value?.focus()) })
 
 onMounted(() => {
   if (!store.loaded) store.load()
@@ -58,12 +61,13 @@ async function removeItem(id: string) {
     </div>
 
     <!-- 添加表单（FAB 唤起） -->
-    <section v-if="showForm" class="rounded-2xl p-5 space-y-4 bg-bg border border-brand/20">
+    <section v-if="showForm" class="rounded-2xl p-5 space-y-4 bg-bg border border-brand/20" @keydown.esc="showForm = false">
       <div class="font-semibold text-sm">{{ t('quote.add') }}</div>
       <div class="space-y-3">
         <label class="block">
           <span class="text-xs text-fg-soft">{{ t('quote.text') }}</span>
           <textarea
+            ref="textInput"
             v-model="draftText"
             rows="3"
             :placeholder="t('quote.textPlaceholder')"
@@ -81,7 +85,7 @@ async function removeItem(id: string) {
               class="input mt-1 w-full"
             />
             <datalist id="quote-cats">
-              <option v-for="c in ['名言', '感悟', '摘录', '歌词', '其他']" :key="c" :value="c" />
+              <option v-for="c in QUOTE_CATEGORIES" :key="c" :value="c" />
             </datalist>
           </label>
           <label class="block">

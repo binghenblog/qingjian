@@ -13,9 +13,10 @@ const toast = useToast()
 
 onMounted(() => {
   if (!store.loaded) store.load()
+  if (store.height !== null) heightInput.value = String(store.height)
 })
 
-// 身高录入（首次）
+// 身高录入 / 编辑
 const heightInput = ref('')
 async function saveHeight() {
   const h = Number(heightInput.value)
@@ -90,8 +91,8 @@ function bmiText(bmi: number): string {
   <div class="space-y-5 max-w-2xl pb-20">
     <h2 class="text-xl font-bold m-0">{{ t('fitness.title') }}</h2>
 
-    <!-- 首次录入身高 -->
-    <section v-if="store.height === null" class="card rounded-2xl p-5 space-y-3">
+    <!-- 身高录入 / 编辑（始终可改） -->
+    <section class="card rounded-2xl p-5 space-y-3">
       <div class="font-semibold text-sm">{{ t('fitness.needHeight') }}</div>
       <p class="text-xs text-fg-faint mt-0 mb-2">{{ t('fitness.needHeightHint') }}</p>
       <div class="flex gap-2">

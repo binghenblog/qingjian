@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, nextTick, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAnniversariesStore } from '@/stores/anniversaries'
 import { useToast } from '@/composables/useToast'
@@ -13,12 +13,21 @@ const toast = useToast()
 const { confirm } = useConfirm()
 
 const showForm = ref(false)
+const nameInput = ref<HTMLInputElement>()
 const draftName = ref('')
 const draftNote = ref('')
 const draftDate = ref(dateKey())
 
 onMounted(() => {
   if (!store.loaded) store.load()
+})
+
+// 表单打开时聚焦名称输入（审查 L-10）
+watch(showForm, async (v) => {
+  if (v) {
+    await nextTick()
+    nameInput.value?.focus()
+  }
 })
 
 function mdLabel(dateStr: string): string {
@@ -70,13 +79,14 @@ async function removeItem(id: string, name: string) {
     </div>
 
     <!-- 添加表单（FAB 唤起） -->
-    <section v-if="showForm" class="rounded-2xl p-5 space-y-4 bg-bg border border-brand/20">
+    <section v-if="showForm" class="rounded-2xl p-5 space-y-4 bg-bg border border-brand/20" @keydown.esc="showForm = false">
       <div class="font-semibold text-sm">{{ t('anniversary.add') }}</div>
       <div class="space-y-3">
         <label class="block">
           <span class="text-xs text-fg-soft">{{ t('anniversary.name') }}</span>
           <input
             v-model="draftName"
+            ref="nameInput"
             type="text"
             :placeholder="t('anniversary.namePlaceholder')"
             class="input mt-1 w-full"
