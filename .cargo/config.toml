@@ -1,0 +1,23 @@
+# Android 交叉编译链接器配置（Tauri v2 生成的原生 Android 工程依赖此文件）。
+#
+# 背景：Tauri 的 android 构建经 Gradle 插件调起 cargo（pnpm tauri android android-studio-script），
+# Gradle daemon 不继承 CI 步骤的 CARGO_TARGET_*_LINKER 环境变量，导致 rustc 链接 cdylib
+# （libqingjian_lib.so）时回落宿主 gcc(cc)，缺少 Android sysroot 而报
+# "unable to find library -landroid / -llog / -lunwind"。
+# 把 linker 写进 cargo 配置文件后，无论 cargo 从哪条路径被调用都会生效。
+#
+# linker 指向 NDK bin 内「不带版本号」的软链名，CI 的「Locate NDK and link clang into PATH」步骤
+# 会创建这些软链并加入 PATH。NDK 的 clang 是包装脚本，会自动附加 --target=*<API> 与 sysroot。
+# 注意：NDK 25 里 armv7 的 clang 名带 'a'（armv7a-linux-androideabi-clang），而 Rust 的
+# target 名是 armv7-linux-androideabi——linker 必须用 NDK 侧的软链名，不能用 Rust target 名。
+[target.aarch64-linux-android]
+linker = "aarch64-linux-android-clang"
+
+[target.armv7-linux-androideabi]
+linker = "armv7a-linux-androideabi-clang"
+
+[target.i686-linux-android]
+linker = "i686-linux-android-clang"
+
+[target.x86_64-linux-android]
+linker = "x86_64-linux-android-clang"

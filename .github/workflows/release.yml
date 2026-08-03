@@ -78,16 +78,24 @@ jobs:
         # 故在 shell 中捕获到 $GITHUB_ENV 供后续步骤复用。
         run: echo "ANDROID_HOME_DIR=${ANDROID_HOME:-$HOME/Android/Sdk}" >> "$GITHUB_ENV"
       - name: Install Android SDK components
-        # setup-android 已 sdkmanager --licenses 接受许可，此处用 yes | 兜底非交互安装
+        # setup-android 已 sdkmanager --licenses 接受许可，此处用 yes | 兜底非交互安装。
+        # compileSdk/targetSdk 为 36（gen/android/app/build.gradle.kts），platform 必须与其一致，
+        # 否则 AGP 报 "failed to find target SDK 36"。
         run: |
-          yes | sdkmanager "platforms;android-34" "build-tools;34.0.0" "ndk;25.2.9519653"
+          yes | sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;25.2.9519653"
       - name: Locate NDK and link clang into PATH
-        # 关键点：不要硬编码 NDK 路径。先定位真实安装的 NDK 目录，再探测其 clang 名称
-        #（不同 NDK 版本带/不带 API 版本号，如 aarch64-linux-android34-clang），
+        # 关键点：不要硬编码 NDK 路径。先定位真实安装的 NDK 目录，再探测各 ABI 的 clang 名称
+        #（NDK 里带 API 版本号，如 aarch64-linux-android34-clang / armv7a-linux-androideabi34-clang），
         # 建立「不带版本号」的符号链接供 cc-rs 与 Rust 链接器识别。
         # 注意：NDK 的 clang 是包装脚本，内部用 $(dirname "$0")/clang 定位真正的编译器，
         # 故软链必须建在 NDK bin 目录内（而非单独的 ndk-bin 目录），否则 $0 的 dirname 错位、
         # 找不到 clang。同时把整个 NDK bin 目录加入 PATH，供 Rust 最终链接（clang/ld.lld/llvm-ar）。
+        # 各 Rust target 对应的 NDK clang 名（NDK 25 的 armv7 带 'a'，与 Rust target 名不同）：
+        #   aarch64-linux-android      -> aarch64-linux-android-clang
+        #   armv7-linux-androideabi    -> armv7a-linux-androideabi-clang
+        #   i686-linux-android         -> i686-linux-android-clang
+        #   x86_64-linux-android       -> x86_64-linux-android-clang
+        # 与 .cargo/config.toml 的 [target.*].linker 一一对应。
         run: |
           set -euo pipefail
           AH="${ANDROID_HOME_DIR:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
@@ -102,17 +110,21 @@ jobs:
           echo "ANDROID_NDK_DIR=${NDK_DIR%/}" >> "$GITHUB_ENV"
           echo "Resolved NDK dir: $NDK_DIR"
           NDK_BIN="$NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          CLANG_REL="$(ls "$NDK_BIN"/aarch64-linux-android*-clang 2>/dev/null | grep -v 'clang++' | head -n1 | xargs -n1 basename || true)"
-          CLANGXX_REL="$(ls "$NDK_BIN"/aarch64-linux-android*-clang++ 2>/dev/null | head -n1 | xargs -n1 basename || true)"
-          if [ -z "$CLANG_REL" ]; then
-            echo "::error::NDK clang not found under $NDK_BIN"; ls -la "$NDK_BIN" || true; exit 1
-          fi
-          echo "Using NDK clang: $CLANG_REL"
-          # 在 NDK bin 目录内建立不带版本号的符号链接（相对路径，dir 不变，包装脚本可正确定位 clang）
-          ln -sf "$CLANG_REL" "$NDK_BIN/aarch64-linux-android-clang"
-          ln -sf "$CLANGXX_REL" "$NDK_BIN/aarch64-linux-android-clang++"
+          for ABI in aarch64-linux-android armv7a-linux-androideabi i686-linux-android x86_64-linux-android; do
+            CLANG_REL="$(ls "$NDK_BIN"/"$ABI"*-clang 2>/dev/null | grep -v 'clang++' | head -n1 | xargs -n1 basename || true)"
+            CLANGXX_REL="$(ls "$NDK_BIN"/"$ABI"*-clang++ 2>/dev/null | head -n1 | xargs -n1 basename || true)"
+            if [ -z "$CLANG_REL" ]; then
+              echo "::error::NDK clang not found for $ABI under $NDK_BIN"; ls -la "$NDK_BIN" || true; exit 1
+            fi
+            echo "Linking $ABI-clang <- $CLANG_REL"
+            ln -sf "$CLANG_REL" "$NDK_BIN/$ABI-clang"
+            ln -sf "$CLANGXX_REL" "$NDK_BIN/$ABI-clang++"
+          done
           ln -sf llvm-ar "$NDK_BIN/aarch64-linux-android-ar"
-          # 把 NDK bin 加入 PATH：cc-rs 按 aarch64-linux-android-clang 找编译器，
+          ln -sf llvm-ar "$NDK_BIN/armv7a-linux-androideabi-ar"
+          ln -sf llvm-ar "$NDK_BIN/i686-linux-android-ar"
+          ln -sf llvm-ar "$NDK_BIN/x86_64-linux-android-ar"
+          # 把 NDK bin 加入 PATH：cc-rs 按 $ABI-clang 找编译器，
           # rustc 链接阶段还需 clang / ld.lld / llvm-ar（均位于 NDK bin）。
           echo "$NDK_BIN" >> "$GITHUB_PATH"
       - name: Decode signing keystore
@@ -125,16 +137,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NDK_HOME: ${{ env.ANDROID_NDK_DIR }}
           ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_DIR }}
-          # cc-rs / Rust 交叉编译工具链按 aarch64-linux-android-clang（不带版本号）在 PATH 上找编译器；
-          # 该名字已由上一步入 PATH 的软链提供，这里再显式声明双保险。
+          # rustc 最终链接 cdylib（libqingjian_lib.so）的 linker 已由仓库根 .cargo/config.toml
+          # 配置（[target.*].linker 指向 NDK bin 内无版本号软链名），cargo 无论从 gradle 还是
+          # 直接调用都会读取，不依赖环境变量透传（Gradle daemon 不继承此步骤的自定义 env）。
+          # 此处仅保留 cc-rs / build script（如 ring）需要的编译器名，作 PATH 兜底。
           CC_aarch64_linux_android: aarch64-linux-android-clang
           CXX_aarch64_linux_android: aarch64-linux-android-clang++
           AR_aarch64_linux_android: aarch64-linux-android-ar
-          # rustc 最终链接 cdylib（libqingjian_lib.so）必须用 NDK 的 clang 作链接器，
-          # 其包装脚本会自动带 --target=aarch64-linux-android<API> 与 sysroot，从而找到
-          # -landroid / -llog / -lunwind 等 NDK 系统库；否则回落宿主 gcc(cc)，报
-          # "unable to find library -landroid / -llog / -lunwind"。
-          CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER: aarch64-linux-android-clang
           # 签名（可选，未配置 Secrets 时用 debug key 构建）
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
