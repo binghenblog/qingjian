@@ -13,7 +13,7 @@ docs/
 
 # Tauri 生成物（构建时产生，不入库）
 /src-tauri/target
-/src-tauri/gen
+/src-tauri/gen/schemas
 /src-tauri/gen.schema.json
 
 # 用户数据（本地优先，绝不入库）
