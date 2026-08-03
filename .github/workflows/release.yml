@@ -130,6 +130,11 @@ jobs:
           CC_aarch64_linux_android: aarch64-linux-android-clang
           CXX_aarch64_linux_android: aarch64-linux-android-clang++
           AR_aarch64_linux_android: aarch64-linux-android-ar
+          # rustc 最终链接 cdylib（libqingjian_lib.so）必须用 NDK 的 clang 作链接器，
+          # 其包装脚本会自动带 --target=aarch64-linux-android<API> 与 sysroot，从而找到
+          # -landroid / -llog / -lunwind 等 NDK 系统库；否则回落宿主 gcc(cc)，报
+          # "unable to find library -landroid / -llog / -lunwind"。
+          CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER: aarch64-linux-android-clang
           # 签名（可选，未配置 Secrets 时用 debug key 构建）
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
