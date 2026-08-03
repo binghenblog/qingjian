@@ -23,6 +23,9 @@ serde_json = "1.0"
 # default-features=false 去除 native-tls（OpenSSL），仅保留所需特性（审查 M-9）
 reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
 futures-util = "0.3"
+# SSRF 防护（审查 H-1）：spawn_blocking 做阻塞式 DNS 解析、time::timeout 做流式分块超时（L-3），
+# 复用 tauri 已引入的 tokio 1.x，仅开启所需特性。
+tokio = { version = "1", features = ["rt", "time"] }
 
 [features]
 # 默认不启用自定义协议

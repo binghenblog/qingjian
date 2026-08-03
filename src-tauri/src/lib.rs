@@ -4,6 +4,8 @@
 
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::net::{IpAddr, ToSocketAddrs};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::ipc::Channel;
@@ -22,49 +24,77 @@ struct ChatMsg {
     content: String,
 }
 
-/// 跨命令共享状态：当前 AI 流式请求的取消标记（审查 H-8 / M-10）。
-/// 每次 `ai_chat` 生成独立的 `Arc<AtomicBool>` 作为取消令牌并写入此处，
-/// 因此取消「当前」请求不会误伤其它并发请求，新请求也不会清除旧请求的取消标志。
+/// 跨命令共享状态：进行中 AI 流式请求的取消令牌表，按 request_id 映射（审查 M-7）。
+/// 每个 `ai_chat` 生成独立 `Arc<AtomicBool>` 作为取消令牌并以 request_id 登记，
+/// `cancel_ai_chat` 仅置位对应请求，互不影响，新请求也不会清除旧请求的取消标志。
 struct AiState {
-    cancel: Mutex<Arc<AtomicBool>>,
+    cancel: Mutex<HashMap<String, Arc<AtomicBool>>>,
 }
 
-/** 受限内部地址：回环 / 私有网段 / 链路本地 / 唯一本地，SSRF 防护（审查 H-3 / H-5 / M-23）。
- * 说明：Rust 中转命令 `ai_chat` 仅由「云端」provider 调用（本地 Ollama 走前端直连路径），
- * 因此此处可放心拦截所有私有/回环地址，避免恶意配置诱导后端携带 API Key 请求内网造成凭证泄漏。 */
-fn is_blocked_host(host: &str) -> bool {
-    let h = host.to_lowercase();
-    // 回环 / 全零
-    if h == "localhost" || h == "0.0.0.0" || h == "127.0.0.1" || h == "::1" || h == "::" {
-        return true;
-    }
-    if h.contains(':') {
-        // IPv6：链路本地 fe80::/10、唯一本地 fc00::/7
-        return h.starts_with("169.254.") || h.starts_with("fe80") || h.starts_with("fc") || h.starts_with("fd");
-    }
-    if h.contains('.') {
-        // IPv4 链路本地
-        if h.starts_with("169.254.") {
-            return true;
+/// 判定某 IP 是否受限（SSRF 防护，审查 C-1 / H-1 / M-1 / M-2）：
+/// 覆盖回环 / 未指定 / 私有网段 / 链路本地 / 唯一本地 / 多播 / 文档地址。
+/// IPv4-mapped IPv6（::ffff:a.b.c.d）先还原为 IPv4 再判定。
+fn is_blocked_ip(ip: IpAddr) -> bool {
+    let ip = match ip {
+        IpAddr::V6(v6) => {
+            if let Some(v4) = v6.to_ipv4_mapped() {
+                IpAddr::V4(v4)
+            } else {
+                IpAddr::V6(v6)
+            }
         }
-        // 解析前两段，判定 RFC 1918 私有网段
-        let mut parts = h.split('.');
-        let first: u32 = match parts.next().and_then(|p| p.parse().ok()) {
-            Some(v) if v <= 255 => v,
-            _ => return false,
-        };
-        let second: u32 = match parts.next().and_then(|p| p.parse().ok()) {
-            Some(v) if v <= 255 => v,
-            _ => return false,
-        };
-        // 10.0.0.0/8、172.16.0.0/12、192.168.0.0/16
-        return first == 10 || (first == 172 && (16..=31).contains(&second)) || (first == 192 && second == 168);
+        other => other,
+    };
+    match ip {
+        IpAddr::V4(v4) => {
+            let o = v4.octets();
+            v4.is_unspecified()
+                || v4.is_loopback()
+                || v4.is_private()
+                || v4.is_link_local()
+                || v4.is_multicast()
+                // 文档/测试网段（TEST-NET），is_documentation 当前不稳定，手工判定（审查 M-1）
+                || (o[0] == 192 && o[1] == 0 && o[2] == 2)
+                || (o[0] == 198 && o[1] == 51 && o[2] == 100)
+                || (o[0] == 203 && o[1] == 0 && o[2] == 113)
+        }
+        IpAddr::V6(v6) => {
+            let o = v6.octets();
+            v6.is_unspecified()
+                || v6.is_loopback()
+                || v6.is_unique_local()
+                || v6.is_unicast_link_local()
+                || v6.is_multicast()
+                // 2001:db8::/32 文档网段（is_documentation 不稳定，手工判定，审查 M-1）
+                || (o[0] == 0x20 && o[1] == 0x01 && o[2] == 0x0d && o[3] == 0xb8)
+        }
     }
-    false
 }
 
-/// 校验并归一化 AI 接口地址（审查 H-3 / H-5）：必须 http/https；拦截回环/私有/链路本地地址。
-fn safe_url(raw: &str) -> Result<String, String> {
+/// 校验 host 是否受限（SSRF 防护，审查 H-1 / H-3 / M-1 / M-2）：
+/// - 先尝试当 IP 字面量解析（覆盖十进制 `2130706433` / 十六进制 `0x7f000001` / 尾点 `127.0.0.1.` 等编码绕过）；
+/// - 失败则作为域名用系统 resolver 解析全部 A/AAAA 记录，逐一判定网段（覆盖 `127.0.0.0/8`、`10/8`、`172.16/12`、`192.168/16`、`169.254/16`、`fe80::/10`、`fc00::/7`、`::1`）。
+/// 解析失败（DNS 不可达等）保守拦截，避免放行未知地址。
+async fn is_blocked_host(host: &str) -> bool {
+    // 纯 IP 字面量（调用方已去除 IPv6 方括号）
+    if let Ok(ip) = host.parse::<IpAddr>() {
+        return is_blocked_ip(ip);
+    }
+    // 域名：阻塞式 DNS 解析（spawn_blocking 避免阻塞 async executor），逐 IP 判定
+    let host = host.to_string();
+    tokio::task::spawn_blocking(move || {
+        match (host.as_str(), 0u16).to_socket_addrs() {
+            Ok(mut addrs) => addrs.any(|a| is_blocked_ip(a.ip())),
+            // 解析失败：保守策略，拦截（宁可误拦，不放开内网）
+            Err(_) => true,
+        }
+    })
+    .await
+    .unwrap_or(true)
+}
+
+/// 校验并归一化 AI 接口地址（审查 H-3 / H-5 / M-23）：必须 http/https；拦截受限 host。
+async fn safe_url(raw: &str) -> Result<String, String> {
     let base = raw.trim();
     if base.is_empty() {
         return Err("未填写 AI 接口地址".into());
@@ -93,27 +123,36 @@ fn safe_url(raw: &str) -> Result<String, String> {
     } else {
         raw_host
     };
-    if is_blocked_host(&host) {
+    if is_blocked_host(&host).await {
         return Err("接口地址指向受限内部地址，已被安全策略拦截".into());
     }
     Ok(base.trim_end_matches('/').to_string())
 }
 
 /// 云端 AI 流式中转（审查 C-2 / C-3）。
-/// 由 Rust 后端发起请求，密钥不进入前端 JS，规避 WebView CSP / CORS 限制；
+/// 由 Rust 后端发起请求，密钥经前端传入但仅驻留内存、规避 WebView CSP / CORS 限制；
 /// 通过 `Channel` 把每个 token 推回前端，保持流式体验。
+///
+/// ⚠️ 安全（审查 H-2 / H-6 残留）：Web 端密钥当前仍以明文存在于前端内存；桌面端最终应由
+/// Rust 安全存储（keyring / 平台凭据库）保管，调用 `ai_chat` 时不经前端传递明文 Key。
+/// 本报告将「密钥不进入前端 JS」的措辞修正为上述现状，避免不实承诺。
 #[tauri::command(rename = "ai-chat")]
 async fn ai_chat(
     config: AiConfig,
     messages: Vec<ChatMsg>,
+    request_id: String,
     on_token: Channel<String>,
     state: State<'_, AiState>,
 ) -> Result<(), String> {
-    // 生成本次请求的独立取消令牌，替换当前令牌（审查 M-10）
+    // 本请求的独立取消令牌，按 request_id 登记（审查 M-7）
     let cancel_token = Arc::new(AtomicBool::new(false));
-    *state.cancel.lock().unwrap() = cancel_token.clone();
+    state
+        .cancel
+        .lock()
+        .expect("ai state lock poisoned")
+        .insert(request_id.clone(), cancel_token.clone());
 
-    let base = safe_url(&config.base_url)?;
+    let base = safe_url(&config.base_url).await?;
     let url = if base.ends_with("/chat/completions") {
         base
     } else {
@@ -141,9 +180,13 @@ async fn ai_chat(
         "stream": true
     });
 
-    // 请求超时，避免云端无响应时应用永久挂起（审查 H-7）
+    // 超时策略（审查 L-3）：仅限制连接建立（15s），流式读取不设硬性总超时，避免超长回复被截断；
+    // 另对「空闲读」设置 60s 上限，防止云端保持连接但不发数据导致永久挂起。
     let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(120))
+        .connect_timeout(std::time::Duration::from_secs(15))
+        // 严禁自动跟随重定向：SSRF 防护关键（审查 C-1）。攻击者配置的域名若 302 跳转到
+        // 169.254.169.254 / 127.0.0.1 等内网，会原样携带 Authorization 头，导致凭证泄漏。
+        .redirect(reqwest::redirect::Policy::none())
         .build()
         .map_err(|e| e.to_string())?;
 
@@ -160,6 +203,7 @@ async fn ai_chat(
         let txt = res.text().await.unwrap_or_default();
         // 按字符截断（非字节），避免多字节 UTF-8 落在边界处 panic（审查 H-6）
         let clip: String = txt.chars().take(200).collect();
+        let _ = state.cancel.lock().expect("ai state lock poisoned").remove(&request_id);
         return Err(format!(
             "云端请求失败 ({}){}",
             status,
@@ -173,13 +217,22 @@ async fn ai_chat(
 
     let mut stream = res.bytes_stream();
     let mut buf = String::new();
-    while let Some(chunk) = stream.next().await {
-        // 用户点「停止」→ 中止循环（审查 H-8 / M-10，仅检查本请求的令牌）
+    const MAX_BUF: usize = 1 << 20; // 1 MiB：异常端点保护，防止内存膨胀（审查 L-2）
+    loop {
+        // 空闲读超时（审查 L-3）：60s 无新数据则中止
+        let chunk = match tokio::time::timeout(std::time::Duration::from_secs(60), stream.next()).await {
+            Ok(Some(c)) => c,
+            Ok(None) => break,
+            Err(_) => break,
+        };
         if cancel_token.load(Ordering::Relaxed) {
             break;
         }
         let bytes = chunk.map_err(|e| e.to_string())?;
         buf.push_str(&String::from_utf8_lossy(&bytes));
+        if buf.len() > MAX_BUF {
+            buf.clear(); // 异常超长 payload：丢弃
+        }
         while let Some(pos) = buf.find('\n') {
             let line: String = buf.drain(..pos + 1).collect();
             let line = line.trim();
@@ -189,6 +242,7 @@ async fn ai_chat(
             let data = line.trim_start_matches("data:").trim();
             if data == "[DONE]" {
                 let _ = on_token.send("__DONE__".to_string());
+                let _ = state.cancel.lock().expect("ai state lock poisoned").remove(&request_id);
                 return Ok(());
             }
             if let Ok(v) = serde_json::from_str::<serde_json::Value>(data) {
@@ -204,15 +258,36 @@ async fn ai_chat(
             }
         }
     }
+    // 流结束：处理不以换行结尾的末行（审查 L-2），避免最后 token 丢失
+    let rest = buf.trim();
+    if !rest.is_empty() && rest.starts_with("data:") {
+        let data = rest.trim_start_matches("data:").trim();
+        if data != "[DONE]" {
+            if let Ok(v) = serde_json::from_str::<serde_json::Value>(data) {
+                if let Some(delta) = v
+                    .get("choices")
+                    .and_then(|c| c.get(0))
+                    .and_then(|c| c.get("delta"))
+                    .and_then(|d| d.get("content"))
+                    .and_then(|c| c.as_str())
+                {
+                    let _ = on_token.send(delta.to_string());
+                }
+            }
+        }
+    }
     let _ = on_token.send("__DONE__".to_string());
+    let _ = state.cancel.lock().expect("ai state lock poisoned").remove(&request_id);
     Ok(())
 }
 
-/// 取消进行中的 AI 流式请求（审查 H-8 / M-10）：仅置位当前请求的令牌。
+/// 取消指定 request_id 的 AI 流式请求（审查 H-8 / M-7）：仅置位对应令牌，互不影响。
 #[tauri::command(rename = "cancel-ai-chat")]
-fn cancel_ai_chat(state: State<'_, AiState>) {
-    let guard = state.cancel.lock().unwrap();
-    guard.store(true, Ordering::Relaxed);
+fn cancel_ai_chat(request_id: String, state: State<'_, AiState>) {
+    let guard = state.cancel.lock().expect("ai state lock poisoned");
+    if let Some(token) = guard.get(&request_id) {
+        token.store(true, Ordering::Relaxed);
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -221,7 +296,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .manage(AiState {
-            cancel: Mutex::new(Arc::new(AtomicBool::new(false))),
+            cancel: Mutex::new(HashMap::new()),
         })
         .invoke_handler(tauri::generate_handler![ai_chat, cancel_ai_chat])
         .run(tauri::generate_context!())
