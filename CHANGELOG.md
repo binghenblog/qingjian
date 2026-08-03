@@ -15,6 +15,7 @@ v0.3.0 是继 v0.2.0 之后的功能与健壮性大版本：新增多个生活�
 - **笔记删除撤销**：删除笔记后可撤销，Toast 支持动作按钮。
 - **AI × 本地数据**：AI 对话可直接读取笔记/待办上下文（`buildContext` 注入，附注入安全提示），支持「就这篇笔记与 AI 讨论」「周总结」「规划待办」等快捷动作。
 - **左侧抽屉式导航**：导航栏改为左侧抽屉，配 ⌘K 命令面板；按钮经半圆无阴影 → 正方形圆角迭代，打开时右侧页面自动收窄。
+- **Android APK 自动构建（M5）**：`tauri android init` 生成 Android 工程骨架并提交仓库；`release.yml` 新增独立 android job（ubuntu + JDK17 + NDK r25c），推 `v0.3.0` 触发 Windows + Linux + APK 三端出包（未配签名 Secrets 时用 debug key 构建）。
 
 ### Changed
 - **数据层**：升级至 Dexie v4 表结构。
