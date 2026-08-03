@@ -140,12 +140,25 @@ jobs:
           NDK_HOME: ${{ env.ANDROID_NDK_DIR }}
           ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_DIR }}
           ANDROID_HOME: ${{ env.ANDROID_HOME_DIR }}
-          # 签名（可选，未配置 Secrets 时用 debug key 构建）
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           pnpm tauri android build --apk --ci -t aarch64
-      # 上传 APK 到 Release（无论是否配置签名 Secrets，tauri 都会产出 apk；debug key 版可直接安装）
+      # 用 apksigner 对 APK 签名（Android 系统拒绝安装未签名 APK）。
+      # 配置了 keystore Secrets 时签名为 release 证书；否则保持 tauri 生成的 debug key 签名。
+      # 签名会覆盖原文件（unsigned 文件不可安装，无需保留）。
+      - name: Sign APK
+        if: env.KEYSTORE_SET == 'true'
+        run: |
+          APKSIGNER="$ANDROID_HOME_DIR/build-tools/36.0.0/apksigner"
+          for apk in src-tauri/gen/android/app/build/outputs/apk/universal/release/*.apk; do
+            echo "Signing $apk"
+            "$APKSIGNER" sign \
+              --ks android.keystore \
+              --ks-key-alias "${{ secrets.KEY_ALIAS }}" \
+              --ks-pass "pass:${{ secrets.KEY_PASSWORD }}" \
+              --key-pass "pass:${{ secrets.KEY_PASSWORD }}" \
+              "$apk"
+          done
+      # 上传 APK 到 Release
       - name: Upload APK to Release
         uses: softprops/action-gh-release@v2
         env:
@@ -153,4 +166,4 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           files: |
-            src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+            src-tauri/gen/android/app/build/outputs/apk/universal/release/*.apk
