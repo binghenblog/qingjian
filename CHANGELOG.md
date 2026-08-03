@@ -4,6 +4,20 @@ All notable changes to 青简 (QingJian) are documented here.
 
 The project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] - 2026-08-03
+
+v0.5.0 是图标统一与打包体验修复版：把 Web / 桌面 / 移动三端的应用图标与品牌标识拉齐，并修复「打包后的 exe / apk 安装后导航栏图标不显示」问题。
+
+### Added
+- **应用图标统一**：源图 `docs/1.png`（1502×1502 透明圆角 PNG），经 `pnpm tauri icon docs/1.png` 一次性生成桌面 `src-tauri/icons/*` 与 Android `mipmap-*` 多分辨率集合；Android 自适应图标（foreground PNG + 背景色）正确接线。
+- **Web favicon 三件套**：`public/favicon.ico`（多尺寸）、`public/favicon.svg`、`public/apple-touch-icon.png`，由 `index.html` 的 `<link>` 引用。
+
+### Fixed
+- **打包后导航栏 / 设置页品牌 logo 不显示**：原 `<img src="/logo.png">` 在 Tauri `asset://` 协议 + `base: './'` 相对路径下打包后加载失败。改为内联 `data:` URI（`src/assets/logo.ts` 的 `appLogoDataUri`），导航栏与「关于」页 logo 在 exe / apk 安装后稳定显示。
+
+### Changed
+- **版本号**：`package.json` / `src-tauri/tauri.conf.json` / `Cargo.toml` / `Cargo.lock` / 中英文 i18n `version` 字段统一升至 `0.5.0`。
+
 ## [0.4.0] - 2026-08-03
 
 v0.4.0 是修复版：核心是修复 Android APK 交叉编译链接失败（经 Gradle 调起 cargo 时 linker 回落宿主 gcc）、并让 APK 可正常安装（apksigner 签名）、修复桌面端 CSP 运行期 JS 错误；同时完成一轮无障碍 / i18n / 数据健壮性修复，补充 AI 服务安全单测。
@@ -55,6 +69,7 @@ v0.3.0 是继 v0.2.0 之后的功能与健壮性大版本：新增多个生活�
 - 全站 UI 文案经 vue-i18n 渲染。
 - 多轮安全/稳定性审查修复（Critical/High/Medium/Low）。
 
+[0.5.0]: https://github.com/binghenblog/qingjian/releases/tag/v0.5.0
 [0.4.0]: https://github.com/binghenblog/qingjian/releases/tag/v0.4.0
 [0.3.0]: https://github.com/binghenblog/qingjian/releases/tag/v0.3.0
 [0.2.0]: https://github.com/binghenblog/qingjian/releases/tag/v0.2.0

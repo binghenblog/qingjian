@@ -1,12 +1,18 @@
 :root {
-  /* 品牌色：青 + 天蓝 */
-  --c-brand: #14b8a6;
-  --c-brand-strong: #0d9488;
-  --c-brand-soft: #14b8a61a;
-  --c-brand-grad: linear-gradient(135deg, #14b8a6 0%, #0ea5e9 100%);
+  /* 品牌色：青简青（与竹叶图标同色系 #26A69A，全站统一主色） */
+  --c-brand: #26a69a;
+  --c-brand-strong: #1e8c82;
+  --c-brand-soft: #26a69a2e;
+  --c-brand-grad: linear-gradient(135deg, #26a69a 0%, #1e8c82 100%);
 
-  /* 主视觉蓝（参考工作台风格） */
-  --c-hero: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%);
+  /* 主视觉横幅：与品牌同色系渐变（杜绝蓝色 / 冷暖混搭） */
+  --c-hero: linear-gradient(135deg, #2bb3a6 0%, #1e8c82 100%);
+
+  /* 辅助色：成功=浅青；警告=橙黄（逾期任务）；禁用紫色 */
+  --c-success: #26a69a;
+  --c-success-soft: #26a69a1f;
+  --c-warning: #f59e0b;
+  --c-warning-soft: #f59e0b1f;
 
   /* 表面层次：页面底 → 卡片面 → 悬浮面 */
   --c-bg: #f4f6f9;
@@ -17,26 +23,34 @@
   --c-fg-faint: #3f4b5b;
   --c-border: #e5e7eb;
 
-  /* 阴影 */
-  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06);
-  --shadow-md: 0 4px 12px rgba(16, 24, 40, 0.08), 0 2px 4px rgba(16, 24, 40, 0.04);
-  --shadow-lg: 0 12px 32px rgba(16, 24, 40, 0.14), 0 4px 8px rgba(16, 24, 40, 0.06);
+  /* 阴影：单层柔和浅阴影（规范：杜绝多重阴影，浅色不过重） */
+  --shadow-sm: 0 1px 3px rgba(16, 24, 40, 0.06);
+  --shadow-md: 0 4px 14px rgba(16, 24, 40, 0.08);
+  --shadow-lg: 0 10px 28px rgba(16, 24, 40, 0.12);
 
   /* 主题化彩色阴影：暗色单独适配（审查 L-32） */
-  --c-hero-shadow: 0 12px 32px rgba(37, 99, 235, 0.28), 0 4px 10px rgba(37, 99, 235, 0.16);
-  --c-brand-shadow-hover: 0 4px 14px rgba(20, 184, 166, 0.35);
+  --c-hero-shadow: 0 8px 24px rgba(43, 179, 166, 0.3);
+  --c-brand-shadow-hover: 0 4px 14px rgba(43, 179, 166, 0.4);
 
-  --radius: 12px;
+  /* 圆角规范（全项目复用，杜绝大小混乱）：卡片 16px / 按钮 10px / 小面板 12px / 小元素内角 8px */
+  --radius-sm: 8px;
+  --radius: 10px;
+  --radius-md: 12px;
   --radius-lg: 16px;
 }
 
 .dark {
-  --c-brand: #2dd4bf;
-  --c-brand-strong: #14b8a6;
-  --c-brand-soft: #2dd4bf1f;
-  --c-brand-grad: linear-gradient(135deg, #2dd4bf 0%, #38bdf8 100%);
+  --c-brand: #2bb3a6;
+  --c-brand-strong: #26a69a;
+  --c-brand-soft: #2bb3a62e;
+  --c-brand-grad: linear-gradient(135deg, #2bb3a6 0%, #1e8c82 100%);
 
-  --c-hero: linear-gradient(135deg, #3b82f6 0%, #0ea5e9 100%);
+  --c-hero: linear-gradient(135deg, #2bb3a6 0%, #1e8c82 100%);
+
+  --c-success: #2bb3a6;
+  --c-success-soft: #2bb3a61f;
+  --c-warning: #fbbf24;
+  --c-warning-soft: #f59e0b26;
 
   --c-bg: #0b0f17;
   --c-surface: #151b25;
@@ -46,13 +60,19 @@
   --c-fg-faint: #9ca3af;
   --c-border: #253046;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.55);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 10px 28px rgba(0, 0, 0, 0.45);
 
   /* 暗色下增强彩色阴影对比（审查 L-32） */
-  --c-hero-shadow: 0 12px 32px rgba(56, 130, 246, 0.45), 0 4px 12px rgba(56, 130, 246, 0.3);
-  --c-brand-shadow-hover: 0 4px 16px rgba(45, 212, 191, 0.45);
+  --c-hero-shadow: 0 8px 24px rgba(43, 179, 166, 0.3);
+  --c-brand-shadow-hover: 0 4px 14px rgba(43, 179, 166, 0.4);
+
+  /* 圆角规范（与浅色一致）：卡片 16px / 按钮 10px / 小面板 12px / 小元素内角 8px */
+  --radius-sm: 8px;
+  --radius: 10px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
 }
 
 * { box-sizing: border-box; }
@@ -128,25 +148,25 @@ a { color: inherit; text-decoration: none; }
   pointer-events: none;
 }
 
-/* 次按钮（白底） */
+/* 次按钮（白底青字） */
 .btn-secondary {
   background: rgba(255, 255, 255, 0.95);
-  color: #2563eb;
+  color: var(--c-brand-strong);
   border: none;
   border-radius: var(--radius);
   font-weight: 500;
   cursor: pointer;
   transition: opacity 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-sm);
 }
 .btn-secondary:hover:not(:disabled) {
   opacity: 0.95;
   transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--shadow-md);
 }
 .btn-secondary:active:not(:disabled) { transform: translateY(0); }
-/* 暗色主题下保持与浅色一致的白底蓝字（按钮始终位于 Hero 渐变之上，审查 M-40） */
-.dark .btn-secondary { background: rgba(255, 255, 255, 0.92); color: #1d4ed8; }
+/* 暗色主题下保持与浅色一致的白底青字（按钮始终位于 Hero 渐变之上，审查 M-40） */
+.dark .btn-secondary { background: rgba(255, 255, 255, 0.92); color: var(--c-brand-strong); }
 
 /* 主按钮 */
 .btn-primary {

@@ -4,8 +4,12 @@ export default {
   app: {
     name: 'QingJian',
     tagline: 'Personal Workbench',
-    footer: 'Local-first · Your data stays with you',
-    version: 'v0.4.0'
+    footer: 'Local-first · Your data is yours to control',
+    version: 'v0.5.0'
+  },
+  kbd: {
+    search: 'Open search / command palette',
+    newTask: 'Quick new task'
   },
   common: {
     confirm: 'Confirm',
@@ -31,7 +35,6 @@ export default {
   dashboard: {
     greetingNight: 'Late night',
     greetingMorning: 'Good morning',
-    greetingNoon: 'Good noon',
     greetingAfternoon: 'Good afternoon',
     greetingEvening: 'Good evening',
     newWork: 'New work',
@@ -40,8 +43,10 @@ export default {
     heroTitle: 'Compile chaos into order.',
     heroSub: 'Every entry feeds your weekly report, achievement library and skill trail.',
     heroCta: 'Log what you just did',
+    heroDismiss: 'Dismiss banner',
     todayPush: 'Push forward today',
     allTodos: 'All tasks',
+    newTask: 'New task',
     doneOf: '{done} / {total} done',
     yesterdayMissed: '{n} left from yesterday',
     weekProgress: 'This week’s progress',
@@ -56,7 +61,11 @@ export default {
     featureTodos: 'Tasks',
     featureTodosDesc: 'GTD-style task management',
     featureAi: 'AI Assistant',
-    featureAiDesc: 'Cloud / Local dual channel'
+    featureAiDesc: 'Cloud / Local dual channel',
+    emptyDoneTitle: '🎉 All tasks done for today!',
+    emptyDoneHint: 'Record what you gained today, or plan for tomorrow.',
+    recTodayGain: 'Record today’s gains',
+    planTomorrow: 'Plan tomorrow'
   },
   about: {
     desc: '{version} · Lightweight · Modern · Open-source · Local-first · MIT License'
@@ -109,7 +118,14 @@ export default {
     shortcutHint: 'Jump anywhere, anytime',
     ledgerSummary: 'Ledger summary',
     ledgerSummaryHint: 'Show this week and month totals at the top of the Ledger page',
-    ledgerSummaryToggle: 'Show weekly / monthly totals'
+    ledgerSummaryToggle: 'Show weekly / monthly totals',
+    aiEntry: 'AI assistant entry',
+    aiEntryHint: 'AI features are not in development yet; hide the entry from the sidebar and dashboard',
+    aiEntryToggle: 'Show AI entry in navigation & dashboard',
+    banner: 'Home banner',
+    bannerHint: 'Restore the dismissed Home banner from here',
+    restoreBanner: 'Restore banner',
+    bannerRestored: 'Banner restored'
   },
   notes: {
     dbError: '⚠️ Local database unavailable: {err}',
@@ -143,7 +159,9 @@ export default {
     editorPlaceholder: 'Start writing in Markdown…',
     emptyTitle: 'Note local persistence is ready',
     emptyHint: 'Data is stored in local IndexedDB (Dexie); survives refresh.<br />V1 will support Obsidian Vault direct mount (wikilinks / tags / frontmatter)',
-    noteLabel: 'Note'
+    noteLabel: 'Note',
+    tabNotes: 'Notes',
+    tabQuotes: 'Quotes'
   },
   todos: {
     title: 'Schedule / Tasks',

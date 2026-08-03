@@ -5,10 +5,14 @@ import { useI18n } from 'vue-i18n'
 import CommandPalette from '@/components/CommandPalette.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import ToastHost from '@/components/ToastHost.vue'
+import KbdTip from '@/components/KbdTip.vue'
+import { useSettingsStore } from '@/stores/settings'
 import { useShortcuts } from '@/composables/useShortcuts'
+import { appLogoDataUri } from '@/assets/logo'
 
 useShortcuts()
 const route = useRoute()
+const settings = useSettingsStore()
 const paletteOpen = ref(false)
 const { t } = useI18n()
 
@@ -48,16 +52,22 @@ onMounted(() => window.addEventListener('keydown', onKeydown))
 onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 
 // 导航：图标在上、文字在下的圆角卡片（v0.3.0 导航改版）
-const nav = [
-  { to: '/', key: 'nav.dashboard', icon: 'i-carbon-dashboard' },
-  { to: '/notes', key: 'nav.notes', icon: 'i-carbon-document' },
-  { to: '/todos', key: 'nav.todos', icon: 'i-carbon-task' },
-  { to: '/ledger', key: 'nav.ledger', icon: 'i-carbon-calculator' },
-  { to: '/fitness', key: 'nav.fitness', icon: 'i-carbon-run' },
-  { to: '/anniversaries', key: 'nav.anniversaries', icon: 'i-carbon-calendar' },
-  { to: '/quotes', key: 'nav.quotes', icon: 'i-carbon-bookmark' },
-  { to: '/ai', key: 'nav.ai', icon: 'i-carbon-ai-status' }
-]
+// 顺序：今日桌面 → 日程 → 记账 → 纪念日 → 笔记 → 健身
+// AI 助手默认隐藏；若显示则置于列表最底部并降低透明度（dim），可在设置中开关（showAiEntry）
+const nav = computed(() => {
+  const base: { to: string; key: string; icon: string; dim?: boolean }[] = [
+    { to: '/', key: 'nav.dashboard', icon: 'i-carbon-dashboard' },
+    { to: '/todos', key: 'nav.todos', icon: 'i-carbon-task' },
+    { to: '/ledger', key: 'nav.ledger', icon: 'i-carbon-calculator' },
+    { to: '/anniversaries', key: 'nav.anniversaries', icon: 'i-carbon-calendar' },
+    { to: '/notes', key: 'nav.notes', icon: 'i-carbon-document' },
+    { to: '/fitness', key: 'nav.fitness', icon: 'i-carbon-run' }
+  ]
+  if (settings.showAiEntry) {
+    base.push({ to: '/ai', key: 'nav.ai', icon: 'i-carbon-ai-status', dim: true })
+  }
+  return base
+})
 
 function openPalette() {
   paletteOpen.value = true
@@ -88,7 +98,7 @@ function openPalette() {
     >
       <!-- 顶部：Logo（避开左上角半圆按钮） -->
       <div class="flex items-center gap-2 px-1 py-2 mb-1 shrink-0">
-        <span class="logo-mark w-8 h-8 rounded-lg text-white grid place-items-center text-base font-bold shrink-0">青</span>
+        <img :src="appLogoDataUri" alt="青简" class="w-8 h-8 rounded-lg object-cover shrink-0 ring-1 ring-border/50 shadow-sm" />
         <div class="leading-tight">
           <div class="font-bold text-base tracking-wide truncate">{{ t('app.name') }}</div>
           <div class="text-[11px] text-fg-faint truncate">{{ t('app.tagline') }}</div>
@@ -102,6 +112,7 @@ function openPalette() {
           :key="n.to"
           :to="n.to"
           class="nav-card flex flex-col items-center justify-center gap-1 py-2 rounded-xl text-fg-soft"
+          :class="{ 'opacity-60 hover:opacity-100': n.dim }"
           active-class="nav-active"
           :aria-label="t(n.key)"
         >
@@ -112,15 +123,16 @@ function openPalette() {
 
       <!-- 底部：搜索 + 设置 + 版本 -->
       <div class="flex flex-col gap-1 shrink-0 pt-2 border-t border-border">
-        <button
-          class="search-trigger flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-fg-faint cursor-pointer"
-          @click="openPalette"
-          :aria-label="t('nav.searchAria')"
-        >
-          <span class="i-carbon-search text-base shrink-0" />
-          <span>{{ t('nav.search') }}</span>
-          <kbd class="ml-auto">⌘K</kbd>
-        </button>
+        <KbdTip :keys="'Ctrl K'" :label="t('kbd.search')">
+          <button
+            class="search-trigger flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-fg-faint cursor-pointer"
+            @click="openPalette"
+            :aria-label="t('nav.searchAria')"
+          >
+            <span class="i-carbon-search text-base shrink-0" />
+            <span>{{ t('nav.search') }}</span>
+          </button>
+        </KbdTip>
 
         <RouterLink
           to="/settings"
@@ -132,9 +144,9 @@ function openPalette() {
           <span class="text-[11px] leading-tight">{{ t('nav.settings') }}</span>
         </RouterLink>
 
-        <div class="px-3 py-1.5 text-[11px] text-fg-faint flex items-center gap-1.5">
+        <div class="px-3 pt-2 pb-1 mt-1 text-[11px] text-fg-faint flex items-center gap-1.5">
           <span class="w-1.5 h-1.5 rounded-full bg-brand inline-block shrink-0" />
-          {{ t('app.version') }}
+          <span class="truncate leading-none">{{ t('app.version') }}</span>
         </div>
       </div>
     </aside>
@@ -147,7 +159,7 @@ function openPalette() {
       <div class="card h-full flex flex-col overflow-hidden">
         <header class="h-14 pl-14 pr-4 md:px-6 flex items-center justify-between border-b border-border shrink-0">
           <span class="font-semibold truncate">{{ pageTitle }}</span>
-          <span class="text-xs text-fg-faint hidden sm:inline">{{ t('app.footer') }}</span>
+          <span class="text-[13px] text-fg-soft hidden sm:inline">{{ t('app.footer') }}</span>
         </header>
         <div class="flex-1 overflow-auto p-4 md:p-6">
           <slot />
@@ -168,11 +180,6 @@ function openPalette() {
 }
 .nav-fab:hover {
   opacity: 0.92;
-}
-
-.logo-mark {
-  background: var(--c-brand-grad);
-  box-shadow: 0 4px 12px var(--c-brand-soft);
 }
 
 .search-trigger {
@@ -212,10 +219,11 @@ function openPalette() {
   left: 0;
   top: 50%;
   transform: translateY(-50%);
-  width: 3px;
-  height: 20px;
+  width: 4px;
+  height: 24px;
   border-radius: 0 4px 4px 0;
-  background: var(--c-brand-grad);
+  background: var(--c-brand);
+  box-shadow: 0 0 8px var(--c-brand-soft);
 }
 .dark .nav-active {
   color: var(--c-brand);

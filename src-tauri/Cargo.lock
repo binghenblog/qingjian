@@ -2313,7 +2313,7 @@ dependencies = [
 
 [[package]]
 name = "qingjian"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "futures-util",
  "reqwest 0.12.28",

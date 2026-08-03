@@ -6,8 +6,12 @@ export default {
   app: {
     name: '青简',
     tagline: '个人工作台',
-    footer: '本地优先 · 数据在你手中',
-    version: 'v0.4.0'
+    footer: '本地优先・数据归你掌控',
+    version: 'v0.5.0'
+  },
+  kbd: {
+    search: '唤起搜索 / 命令面板',
+    newTask: '快速新建任务'
   },
   common: {
     confirm: '确定',
@@ -32,8 +36,7 @@ export default {
   },
   dashboard: {
     greetingNight: '夜深了',
-    greetingMorning: '早上好',
-    greetingNoon: '中午好',
+    greetingMorning: '上午好',
     greetingAfternoon: '下午好',
     greetingEvening: '晚上好',
     newWork: '新工作',
@@ -42,8 +45,10 @@ export default {
     heroTitle: '把混乱编译成秩序。',
     heroSub: '每一次记录，都会进入你的周报、成果库与技能轨迹。',
     heroCta: '记下刚刚的进展',
+    heroDismiss: '收起横幅',
     todayPush: '今天要推进',
     allTodos: '全部待办',
+    newTask: '新建任务',
     doneOf: '{done} / {total} 已完成',
     yesterdayMissed: '昨日遗留 {n} 项',
     weekProgress: '本周整体进展',
@@ -58,7 +63,11 @@ export default {
     featureTodos: '待办',
     featureTodosDesc: 'GTD 风格任务管理',
     featureAi: 'AI 助手',
-    featureAiDesc: '云端 / 本地双通道'
+    featureAiDesc: '云端 / 本地双通道',
+    emptyDoneTitle: '🎉 今日任务全部完成！',
+    emptyDoneHint: '可以记录今日收获，或者规划明天的事项。',
+    recTodayGain: '记录今日收获',
+    planTomorrow: '规划明天事项'
   },
   about: {
     desc: '{version} · 轻量 · 现代 · 开源 · 本地优先 · MIT License'
@@ -111,7 +120,14 @@ export default {
     shortcutHint: '随时随地快速跳转',
     ledgerSummary: '记账汇总显示',
     ledgerSummaryHint: '在记账页顶部展示本周与本月收支',
-    ledgerSummaryToggle: '显示本周 / 本月收支汇总'
+    ledgerSummaryToggle: '显示本周 / 本月收支汇总',
+    aiEntry: 'AI 助手入口',
+    aiEntryHint: 'AI 功能暂不开发，可在导航栏与今日桌面隐藏入口',
+    aiEntryToggle: '在导航与首页显示 AI 入口',
+    banner: '首页横幅',
+    bannerHint: '收起后的首页 Hero 横幅，可在此一键恢复显示',
+    restoreBanner: '恢复横幅',
+    bannerRestored: '横幅已恢复'
   },
   notes: {
     dbError: '⚠️ 本地数据库不可用：{err}',
@@ -145,7 +161,9 @@ export default {
     editorPlaceholder: '开始用 Markdown 书写…',
     emptyTitle: '笔记本地持久化已就绪',
     emptyHint: '数据已存入本地 IndexedDB（Dexie），刷新不丢。<br />V1 将支持 Obsidian Vault 直连（wikilinks / 标签 / frontmatter）',
-    noteLabel: '笔记'
+    noteLabel: '笔记',
+    tabNotes: '笔记',
+    tabQuotes: '好句'
   },
   todos: {
     title: '日程 / 任务',

@@ -14,11 +14,13 @@ if (import.meta.hot) {
 </script>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useNoteStore } from '@/stores/notes'
 import { useAiStore } from '@/stores/ai'
+import { useQuotesStore, QUOTE_CATEGORIES } from '@/stores/quotes'
+import { dateKey } from '@/stores/todos'
 import { useConfirm } from '@/composables/useConfirm'
 import { useToast } from '@/composables/useToast'
 import { md } from '@/services/markdown'
@@ -30,6 +32,46 @@ const router = useRouter()
 const { t } = useI18n()
 const { confirm } = useConfirm()
 const { info: toastInfo } = useToast()
+const toast = useToast()
+
+// 模块切换：笔记 / 好句（记好句已并入笔记，2026-08-04）
+const activeTab = ref<'notes' | 'quotes'>('notes')
+
+// 好句（quotes）子模块：复用 quotes store，UI 内联以保持与笔记一致的青色风格
+const quotes = useQuotesStore()
+const showQuoteForm = ref(false)
+const qText = ref('')
+const qCategory = ref('')
+const qDate = ref(dateKey())
+const qInput = ref<HTMLTextAreaElement | null>(null)
+watch(showQuoteForm, (v) => {
+  if (v) nextTick(() => qInput.value?.focus())
+})
+onMounted(() => {
+  if (!quotes.loaded) quotes.load()
+})
+async function addQuote() {
+  const text = qText.value.trim()
+  if (!text) {
+    toast.error(t('quote.textRequired'))
+    return
+  }
+  await quotes.add({ text, category: qCategory.value.trim() || undefined, date: qDate.value })
+  qText.value = ''
+  qCategory.value = ''
+  qDate.value = dateKey()
+  showQuoteForm.value = false
+  toast.success(t('quote.added'))
+}
+async function delQuote(id: string) {
+  const ok = await confirm({
+    title: t('quote.confirmDeleteTitle'),
+    message: t('quote.confirmDelete'),
+    confirmText: t('common.delete'),
+    danger: true
+  })
+  if (ok) await quotes.remove(id)
+}
 
 const mode = ref<'edit' | 'preview' | 'split'>('edit')
 const search = ref('')
@@ -276,7 +318,23 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="notes-page h-full grid grid-cols-1 md:grid-cols-[260px_1fr] lg:grid-cols-[300px_1fr] gap-5 -m-4 md:-m-6 p-4 md:p-6">
+  <div class="notes-module -m-4 md:-m-6 h-full flex flex-col">
+    <!-- 模块切换：笔记 / 好句（记好句已并入笔记，2026-08-04） -->
+    <div class="module-tabs shrink-0 flex items-center gap-1 px-4 md:px-6 pt-3 pb-2 border-b border-border">
+      <button
+        class="module-tab px-3 py-1.5 text-sm rounded-lg cursor-pointer"
+        :class="activeTab === 'notes' ? 'module-tab-active' : ''"
+        @click="activeTab = 'notes'"
+      >{{ t('notes.tabNotes') }}</button>
+      <button
+        class="module-tab px-3 py-1.5 text-sm rounded-lg cursor-pointer"
+        :class="activeTab === 'quotes' ? 'module-tab-active' : ''"
+        @click="activeTab = 'quotes'"
+      >{{ t('notes.tabQuotes') }}</button>
+    </div>
+
+    <!-- 笔记面板 -->
+    <div v-show="activeTab === 'notes'" class="notes-page flex-1 min-h-0 grid grid-cols-1 md:grid-cols-[260px_1fr] lg:grid-cols-[300px_1fr] gap-5 p-4 md:p-6">
     <!-- IndexedDB 不可用时的降级提示（审查 H-8），避免无限白屏 -->
     <div
       v-if="store.loadError"
@@ -522,6 +580,61 @@ onMounted(() => {
         </div>
       </div>
     </section>
+    </div>
+
+    <!-- 好句面板（复用 quotes store，记好句已并入笔记） -->
+    <div v-show="activeTab === 'quotes'" class="quotes-pane flex-1 min-h-0 overflow-auto p-4 md:p-6">
+      <div class="max-w-2xl mx-auto space-y-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-xl font-bold m-0">{{ t('notes.tabQuotes') }}</h2>
+          <button class="btn-primary px-3 py-1.5 text-sm rounded-btn flex items-center gap-1.5" @click="showQuoteForm = !showQuoteForm">
+            <span class="i-carbon-add text-base" />{{ t('quote.add') }}
+          </button>
+        </div>
+
+        <!-- 内联添加表单 -->
+        <section v-if="showQuoteForm" class="rounded-2xl p-5 space-y-3 bg-bg border border-brand/20">
+          <label class="block">
+            <span class="text-xs text-fg-soft">{{ t('quote.text') }}</span>
+            <textarea ref="qInput" v-model="qText" rows="3" :placeholder="t('quote.textPlaceholder')" class="input-modern mt-1 w-full resize-none"></textarea>
+          </label>
+          <div class="flex items-end gap-3">
+            <label class="block flex-1">
+              <span class="text-xs text-fg-soft">{{ t('quote.category') }}</span>
+              <input v-model="qCategory" type="text" list="quote-cats" :placeholder="t('quote.categoryPlaceholder')" class="input-modern mt-1 w-full" />
+              <datalist id="quote-cats">
+                <option v-for="c in QUOTE_CATEGORIES" :key="c" :value="c" />
+              </datalist>
+            </label>
+            <label class="block">
+              <span class="text-xs text-fg-soft">{{ t('quote.date') }}</span>
+              <input v-model="qDate" type="date" class="input-modern mt-1" />
+            </label>
+          </div>
+          <div class="flex items-center gap-2 justify-end">
+            <button class="q-cancel px-4 py-2 text-sm" @click="showQuoteForm = false">{{ t('quote.cancel') }}</button>
+            <button class="btn-primary px-4 py-2 text-sm" @click="addQuote">{{ t('quote.save') }}</button>
+          </div>
+        </section>
+
+        <!-- 好句列表 -->
+        <div v-if="quotes.list.length" class="space-y-3">
+          <div v-for="q in quotes.list" :key="q.id" class="quote-card rounded-2xl p-5">
+            <div class="flex items-start justify-between gap-3">
+              <div class="text-[11px] text-fg-faint tracking-wide">
+                <span v-if="q.category">{{ q.category }} · </span>{{ q.date }}
+              </div>
+              <button
+                class="text-[11px] text-fg-faint hover:text-red-500 bg-transparent border-none cursor-pointer shrink-0"
+                @click="delQuote(q.id)"
+              >{{ t('common.delete') }}</button>
+            </div>
+            <p class="quote-text mt-2 mb-0 leading-relaxed">{{ q.text }}</p>
+          </div>
+        </div>
+        <p v-else class="text-sm text-fg-faint m-0">{{ t('quote.empty') }}</p>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -742,4 +855,33 @@ onMounted(() => {
 .markdown-body :deep(img) { max-width: 100%; border-radius: var(--radius); }
 .markdown-body :deep(table) { border-collapse: collapse; width: 100%; margin: 0.8em 0; }
 .markdown-body :deep(th), .markdown-body :deep(td) { border: 1px solid var(--c-border); padding: 6px 10px; text-align: left; }
+
+/* 模块切换标签（笔记 / 好句） */
+.module-tab { color: var(--c-fg-soft); transition: color 0.15s ease, background-color 0.15s ease; }
+.module-tab:hover { color: var(--c-fg); }
+.module-tab-active {
+  background: var(--c-brand-soft);
+  color: var(--c-brand-strong);
+  font-weight: 600;
+}
+.dark .module-tab-active { color: var(--c-brand); }
+
+/* 好句卡片 */
+.quote-card {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-left: 3px solid var(--c-brand);
+}
+.quote-text { font-size: 1rem; color: var(--c-fg); }
+
+/* 好句表单取消按钮 */
+.q-cancel {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  color: var(--c-fg-soft);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+.q-cancel:hover { color: var(--c-fg); border-color: var(--c-brand); background: var(--c-surface-hover); }
 </style>

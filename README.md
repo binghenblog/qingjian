@@ -10,7 +10,7 @@
 
 <p align="center">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-blue.svg" />
-  <img alt="Version" src="https://img.shields.io/badge/version-0.4.0-orange.svg" />
+  <img alt="Version" src="https://img.shields.io/badge/version-0.5.0-orange.svg" />
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS%20%7C%20Android-2ea043.svg" />
   <img alt="Stack" src="https://img.shields.io/badge/stack-Vue%203%20%2B%20Tauri%20v2-42b883.svg" />
 </p>
@@ -170,6 +170,18 @@ qingjian/
 
 ---
 
+## 🖼️ 应用图标与品牌
+
+青简的视觉标识（圆角卡片上的「青」字图标）在 **Web / 桌面 / 移动** 三端统一生成：
+
+- **桌面与移动（Tauri）**：源图 `docs/1.png`（1502×1502 透明圆角 PNG），执行 `pnpm tauri icon docs/1.png` 一次性生成桌面 `src-tauri/icons/*`（`.ico`/`.icns`/StoreLogo 等）与 Android `mipmap-*` 多分辨率集合；Android 自适应图标（foreground + 背景色）已正确接线。
+- **Web favicon**：`public/favicon.ico`（多尺寸）、`public/favicon.svg`、`public/apple-touch-icon.png`，由 `index.html` 的 `<link>` 引用。
+- **导航栏 / 设置页品牌 logo**：为避免 Tauri `asset://` 协议 + 相对路径在打包后加载失败，导航栏与「关于」页的 logo 统一使用内联 `data:` URI（见 `src/assets/logo.ts` 的 `appLogoDataUri`），保证 exe / apk 安装后图标稳定显示。
+
+> 修改品牌图标只需替换 `docs/1.png` 后重跑 `tauri icon` 并更新 `public/` 三件套，前端 `appLogoDataUri` 同步刷新即可。
+
+---
+
 ## 🗺️ 路线图
 
 | 阶段 | 目标 | 状态 |
@@ -189,7 +201,7 @@ qingjian/
 ## 📰 更新日志
 
 - 完整变更记录见 [CHANGELOG.md](CHANGELOG.md)。
-- 最新发布：**[v0.4.0](https://github.com/binghenblog/qingjian/releases/tag/v0.4.0)** —— 修复 Android APK 交叉编译链接（`.cargo/config.toml` 指定 NDK clang 作 linker）、对齐 SDK 平台版本、APK 用 apksigner 签名（可正常安装）、CSP 放行 `unsafe-eval` 修复运行期 JS 错误；并完成一轮无障碍 / i18n / 数据健壮性修复（详见 CHANGELOG）。GitHub Release 含 Windows / Linux 安装包与 Android APK。
+- 最新发布：**[v0.5.0](https://github.com/binghenblog/qingjian/releases/tag/v0.5.0)** —— 统一 Web / 桌面 / 移动三端应用图标（Tauri `tauri icon` 生成桌面与 Android 图标集、Web favicon 三件套），并将导航栏与设置页品牌 logo 改为内联 `data:` URI，修复打包后的 exe / apk 安装后导航栏图标不显示的问题。详见 [CHANGELOG.md](CHANGELOG.md)。GitHub Release 含 Windows / Linux 安装包与 Android APK。
 
 ---
 

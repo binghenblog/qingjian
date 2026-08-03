@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useTodoStore, dateKey } from '@/stores/todos'
 import { useSettingsStore } from '@/stores/settings'
 import TodoBadges from '@/components/TodoBadges.vue'
+import KbdTip from '@/components/KbdTip.vue'
 import { DAILY_CATEGORY } from '@/types'
 
 const router = useRouter()
@@ -22,17 +23,28 @@ onMounted(() => {
 })
 onUnmounted(() => clearInterval(clockTimer))
 
+/** 顶栏实时时钟（秒级），与统计用的 now（分钟级）分离，避免每秒重算柱状图 */
+const clock = ref(new Date())
+let secTimer: number | undefined
+const clockTime = computed(() =>
+  clock.value.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+)
+onMounted(() => {
+  secTimer = window.setInterval(() => (clock.value = new Date()), 1_000)
+})
+onUnmounted(() => clearInterval(secTimer))
+
 const today = computed(() =>
   now.value.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' })
 )
 
+/** 问候语按时段切换：06-12 上午好 / 12-18 下午好 / 18-23 晚上好 / 23-06 夜深了 */
 const greeting = computed(() => {
   const h = now.value.getHours()
-  if (h < 6) return 'dashboard.greetingNight'
-  if (h < 12) return 'dashboard.greetingMorning'
-  if (h < 14) return 'dashboard.greetingNoon'
-  if (h < 18) return 'dashboard.greetingAfternoon'
-  return 'dashboard.greetingEvening'
+  if (h >= 6 && h < 12) return 'dashboard.greetingMorning'
+  if (h >= 12 && h < 18) return 'dashboard.greetingAfternoon'
+  if (h >= 18 && h < 23) return 'dashboard.greetingEvening'
+  return 'dashboard.greetingNight'
 })
 
 /** 今日待办：未完成（每日任务按今天判定、优先展示），最多 6 条 */
@@ -49,25 +61,50 @@ const todayAdded = computed(() => {
   return store.todos.filter((t) => t.createdAt >= start).length
 })
 
-/** 本周每日完成数（周一到周日，按实际完成日期统计，符合中国习惯，审查 L-30） */
+/** 本周每日完成 / 逾期数（周一到周日，按实际完成日期统计，符合中国习惯，审查 L-30）
+ *  逾期：当天截止、截至「昨天」仍未完成的非每日任务；今日与未来不计逾期 */
 const weekBars = computed(() => {
   const base = new Date(now.value.getFullYear(), now.value.getMonth(), now.value.getDate())
   // 距本周一的天数：getDay() 0=周日…6=周六 → (dow + 6) % 7
   const diffToMonday = (base.getDay() + 6) % 7
   const startOfWeek = base.getTime() - diffToMonday * 24 * 60 * 60 * 1000
-  const bars: number[] = []
+  const todayK = dateKey(now.value)
+  const raw: { done: number; overdue: number }[] = []
   for (let i = 0; i < 7; i++) {
     const d = new Date(startOfWeek + i * 24 * 60 * 60 * 1000)
-    bars.push(store.completedCountOn(dateKey(d)))
+    const k = dateKey(d)
+    const done = store.completedCountOn(k)
+    const overdue =
+      k < todayK
+        ? store.todos.filter((t) => t.category !== DAILY_CATEGORY && !t.done && t.dueDate === k).length
+        : 0
+    raw.push({ done, overdue })
   }
-  const max = Math.max(1, ...bars)
-  return bars.map((count) => ({ count, height: `${Math.round((count / max) * 100)}%` }))
+  const max = Math.max(1, ...raw.map((b) => b.done + b.overdue))
+  return raw.map((b) => ({
+    done: b.done,
+    overdue: b.overdue,
+    donePct: Math.round((b.done / max) * 100),
+    overduePct: Math.round((b.overdue / max) * 100)
+  }))
 })
 
-/** 本周完成总数 */
-const weekDone = computed(() => weekBars.value.reduce((s, b) => s + b.count, 0))
+/** 本周完成总数（仅已完成，不含逾期） */
+const weekDone = computed(() => weekBars.value.reduce((s, b) => s + b.done, 0))
 
 const weekLabels = ['一', '二', '三', '四', '五', '六', '日']
+
+/** 底部快捷入口：AI 助手弱化置右，可在设置中隐藏 */
+const quickCards = computed(() => {
+  const base = [
+    { title: 'dashboard.featureNotes', desc: 'dashboard.featureNotesDesc', to: '/notes', icon: 'i-carbon-document', hue: 'card-teal' },
+    { title: 'dashboard.featureTodos', desc: 'dashboard.featureTodosDesc', to: '/todos', icon: 'i-carbon-task', hue: 'card-teal-soft' }
+  ]
+  if (settings.showAiEntry) {
+    base.push({ title: 'dashboard.featureAi', desc: 'dashboard.featureAiDesc', to: '/ai', icon: 'i-carbon-ai-status', hue: 'card-teal-dim' })
+  }
+  return base
+})
 
 function addTodo() {
   router.push('/todos')
@@ -77,6 +114,12 @@ function addProgress() {
   // 未来可打开"记一笔进展"弹窗；现在跳到待办页
   router.push('/todos')
 }
+
+/** 横幅卡片可关闭（部分用户希望仪表盘更简洁）；状态持久化到设置 store，刷新不复位 */
+const heroHidden = computed(() => settings.dashboardHeroHidden)
+function dismissHero() {
+  settings.dashboardHeroHidden = true
+}
 </script>
 
 <template>
@@ -84,36 +127,50 @@ function addProgress() {
     <!-- 顶部标题栏 -->
     <div class="flex items-end justify-between">
       <div>
-        <div class="text-xs font-medium text-fg-faint tracking-wide mb-1">{{ today }}</div>
+        <div class="flex items-center gap-2 text-xs font-medium text-fg-faint tracking-wide mb-1">
+          <span class="i-carbon-time" />
+          <span>{{ today }}</span>
+          <span class="clock-time tabular-nums">{{ clockTime }}</span>
+        </div>
         <h1 class="text-2xl font-bold m-0 tracking-tight">
           {{ t(greeting) }}，<span class="grad-text">{{ displayName }}</span>
         </h1>
       </div>
       <div class="flex items-center gap-2.5">
-        <button @click="addTodo" class="action-btn flex items-center gap-1.5 px-3.5 py-2 text-sm">
-          <span class="i-carbon-add text-base" />
-          {{ t('dashboard.newWork') }}
-        </button>
-        <button @click="addProgress" class="btn-primary flex items-center gap-1.5 px-4 py-2 text-sm">
+        <KbdTip :keys="'Ctrl N'" :label="t('kbd.newTask')">
+          <button @click="addTodo" class="action-btn flex items-center gap-1.5 px-4 py-2 text-sm rounded-btn">
+            <span class="i-carbon-add text-base" />
+            {{ t('dashboard.newWork') }}
+          </button>
+        </KbdTip>
+        <button @click="addProgress" class="btn-primary flex items-center gap-1.5 px-4 py-2 text-sm rounded-btn">
           <span class="i-carbon-edit text-base" />
           {{ t('dashboard.logProgress') }}
         </button>
       </div>
     </div>
 
-    <!-- Hero 主视觉卡片 -->
-    <section class="hero-card relative p-7 min-h-[180px] flex flex-col justify-between">
+    <!-- Hero 主视觉卡片（可关闭，状态持久化到 localStorage） -->
+    <section v-if="!heroHidden" class="hero-card relative p-7 min-h-[180px] flex flex-col justify-between">
+      <button
+        @click="dismissHero"
+        :aria-label="t('dashboard.heroDismiss')"
+        :title="t('dashboard.heroDismiss')"
+        class="absolute top-3 right-3 z-20 grid place-items-center w-8 h-8 rounded-lg text-white/80 hover:text-white hover:bg-white/15 cursor-pointer transition-colors"
+      >
+        <span class="i-carbon-close text-base" />
+      </button>
       <div class="relative z-10 max-w-lg">
-        <div class="text-xs font-medium text-blue-100/80 mb-2">{{ t('dashboard.heroHint') }}</div>
+        <div class="text-[11px] font-medium text-white/70 mb-2">{{ t('dashboard.heroHint') }}</div>
         <h2 class="text-2xl sm:text-3xl font-bold m-0 leading-snug">
           {{ t('dashboard.heroTitle') }}
         </h2>
-        <p class="text-sm text-blue-50/90 mt-2 mb-0 leading-relaxed">
+        <p class="text-sm text-white/85 mt-2 mb-0 leading-relaxed">
           {{ t('dashboard.heroSub') }}
         </p>
       </div>
       <div class="relative z-10 mt-5">
-        <button @click="addProgress" class="btn-secondary flex items-center gap-1.5 px-4 py-2 text-sm">
+        <button @click="addProgress" class="btn-secondary flex items-center gap-1.5 px-4 py-2 text-sm rounded-btn">
           <span class="i-carbon-edit text-base" />
           {{ t('dashboard.heroCta') }}
         </button>
@@ -136,20 +193,31 @@ function addProgress() {
               {{ t('dashboard.yesterdayMissed', { n: store.yesterdayMissed }) }}
             </span>
           </div>
-          <button
-            @click="router.push('/todos')"
-            class="text-xs text-fg-faint hover:text-brand cursor-pointer bg-transparent border-none flex items-center gap-1"
-          >
-            {{ t('dashboard.allTodos') }}
-            <span class="i-carbon-arrow-right" />
-          </button>
+          <div class="flex items-center gap-2.5">
+            <KbdTip :keys="'Ctrl N'" :label="t('kbd.newTask')">
+              <button
+                @click="router.push('/todos')"
+                class="btn-primary flex items-center gap-1.5 px-4 py-2 text-sm rounded-btn"
+              >
+                <span class="i-carbon-add text-base" />
+                {{ t('dashboard.newTask') }}
+              </button>
+            </KbdTip>
+            <button
+              @click="router.push('/todos')"
+              class="text-xs text-fg-soft hover:text-brand cursor-pointer bg-transparent border-none flex items-center gap-1"
+            >
+              {{ t('dashboard.allTodos') }}
+              <span class="i-carbon-arrow-right" />
+            </button>
+          </div>
         </div>
 
         <TransitionGroup v-if="topPending.length" name="list" tag="ul" class="space-y-2 p-0 m-0 list-none">
           <li
             v-for="todo in topPending"
             :key="todo.id"
-            class="todo-row group flex items-center gap-3 px-3 py-3 rounded-xl"
+            class="todo-row group flex items-center gap-3 px-3 py-3 rounded-btn"
           >
             <button
               @click="store.toggle(todo.id)"
@@ -172,12 +240,39 @@ function addProgress() {
           </li>
         </TransitionGroup>
 
-        <div v-else class="empty grid place-items-center py-12 rounded-xl text-center">
-          <div>
-            <span class="i-carbon-checkmark-outline text-3xl text-fg-faint" />
-            <p class="text-sm text-fg-faint mt-2 mb-0">
-              {{ total ? t('dashboard.emptyDone') : t('dashboard.emptyNone') }}
-            </p>
+        <div v-else class="empty grid place-items-center py-12 rounded-btn text-center">
+          <div class="flex flex-col items-center max-w-md">
+            <span class="i-carbon-checkmark-outline text-3xl text-fg-faint opacity-50" />
+            <template v-if="total">
+              <p class="text-base font-semibold text-fg mt-3 mb-0">{{ t('dashboard.emptyDoneTitle') }}</p>
+              <p class="text-sm text-fg-soft mt-1.5 mb-0 px-4 leading-relaxed">{{ t('dashboard.emptyDoneHint') }}</p>
+              <div class="flex items-center gap-2.5 mt-4">
+                <button
+                  @click="router.push('/notes')"
+                  class="action-btn flex items-center gap-1.5 px-3.5 py-2 text-sm rounded-btn"
+                >
+                  <span class="i-carbon-bookmark text-base" />
+                  {{ t('dashboard.recTodayGain') }}
+                </button>
+                <button
+                  @click="router.push('/todos')"
+                  class="btn-primary flex items-center gap-1.5 px-3.5 py-2 text-sm rounded-btn"
+                >
+                  <span class="i-carbon-task text-base" />
+                  {{ t('dashboard.planTomorrow') }}
+                </button>
+              </div>
+            </template>
+            <template v-else>
+              <p class="text-sm text-fg-faint mt-2 mb-0">{{ t('dashboard.emptyNone') }}</p>
+              <button
+                @click="router.push('/todos')"
+                class="btn-primary flex items-center gap-1.5 px-4 py-2 text-sm mt-4 rounded-btn"
+              >
+                <span class="i-carbon-add text-base" />
+                {{ t('dashboard.newTask') }}
+              </button>
+            </template>
           </div>
         </div>
         </section>
@@ -187,7 +282,7 @@ function addProgress() {
             <span class="font-semibold">{{ t('schedule.today') }}</span>
             <button
               @click="router.push('/todos')"
-              class="text-xs text-fg-faint hover:text-brand cursor-pointer bg-transparent border-none flex items-center gap-1"
+              class="text-xs text-fg-soft hover:text-brand cursor-pointer bg-transparent border-none flex items-center gap-1"
             >
               {{ t('dashboard.allTodos') }}
               <span class="i-carbon-arrow-right" />
@@ -197,7 +292,7 @@ function addProgress() {
             <li
               v-for="todo in store.agenda.today"
               :key="todo.id"
-              class="todo-row group flex items-center gap-3 px-3 py-3 rounded-xl"
+              class="todo-row group flex items-center gap-3 px-3 py-3 rounded-btn"
             >
               <button
                 @click="store.toggle(todo.id)"
@@ -213,7 +308,7 @@ function addProgress() {
               <span class="cat-chip text-[11px] px-2 py-0.5 rounded-full shrink-0">{{ todo.category }}</span>
             </li>
           </TransitionGroup>
-          <div v-else class="empty grid place-items-center py-8 rounded-xl text-center">
+          <div v-else class="empty grid place-items-center py-8 rounded-btn text-center">
             <p class="text-sm text-fg-faint mt-0 mb-0">{{ t('schedule.emptyToday') }}</p>
           </div>
         </section>
@@ -227,51 +322,61 @@ function addProgress() {
         </div>
 
         <div class="grid grid-cols-3 gap-3 mb-5">
-          <div class="stat-cell rounded-xl p-3 text-center">
-            <div class="text-2xl font-bold text-fg">{{ todayAdded }}</div>
-            <div class="text-[11px] text-fg-faint mt-0.5">{{ t('dashboard.todayAdded') }}</div>
+          <div class="stat-cell rounded-btn p-3 text-center flex flex-col items-center justify-center min-h-[88px]">
+            <div class="text-3xl font-bold text-fg leading-none">{{ todayAdded }}</div>
+            <div class="text-[10px] text-fg-faint mt-2">{{ t('dashboard.todayAdded') }}</div>
           </div>
-          <div class="stat-cell rounded-xl p-3 text-center">
-            <div class="text-2xl font-bold text-fg">{{ weekDone }}</div>
-            <div class="text-[11px] text-fg-faint mt-0.5">{{ t('dashboard.weekDone') }}</div>
+          <div class="stat-cell rounded-btn p-3 text-center flex flex-col items-center justify-center min-h-[88px]">
+            <div class="text-3xl font-bold text-fg leading-none">{{ weekDone }}</div>
+            <div class="text-[10px] text-fg-faint mt-2">{{ t('dashboard.weekDone') }}</div>
           </div>
-          <div class="stat-cell rounded-xl p-3 text-center">
-            <div class="text-2xl font-bold text-brand-strong">{{ completionRate }}%</div>
-            <div class="text-[11px] text-fg-faint mt-0.5">{{ t('dashboard.completionRate') }}</div>
+          <div class="stat-cell rounded-btn p-3 text-center flex flex-col items-center justify-center min-h-[88px]">
+            <div class="text-3xl font-bold text-brand-strong leading-none">{{ completionRate }}%</div>
+            <div class="text-[10px] text-fg-faint mt-2">{{ t('dashboard.completionRate') }}</div>
           </div>
         </div>
 
-        <div class="flex-1 flex items-end justify-between gap-1 px-1">
+        <div class="flex-1 flex items-end justify-between gap-1 px-1 pt-2">
           <div
             v-for="(bar, idx) in weekBars"
             :key="idx"
             class="bar-col flex flex-col items-center gap-1.5 flex-1"
+            :title="weekLabels[idx] + '：' + bar.done + ' 项完成'"
           >
             <div class="bar-track w-full rounded-t-md relative" style="height: 84px;">
+              <!-- 逾期（浅橙，垫底） -->
               <div
-                class="bar-fill absolute bottom-0 left-0 right-0 rounded-t-md transition-width duration-500"
-                :style="{ height: bar.height }"
+                v-if="bar.overdue > 0"
+                class="bar-fill-overdue absolute bottom-0 left-0 right-0 rounded-t-sm transition-[height] duration-500"
+                :style="{ height: bar.overduePct + '%' }"
+              />
+              <!-- 已完成（青绿，叠在其上） -->
+              <div
+                v-if="bar.done > 0"
+                class="bar-fill absolute left-0 right-0 rounded-t-sm transition-[height,bottom] duration-500"
+                :style="{ bottom: bar.overduePct + '%', height: bar.donePct + '%' }"
+              />
+              <!-- 空日期：极浅灰占位柱 -->
+              <div
+                v-if="bar.done === 0 && bar.overdue === 0"
+                class="bar-empty-fill absolute bottom-0 left-0 right-0 rounded-t-sm"
               />
             </div>
-            <span class="text-[10px] text-fg-faint">{{ weekLabels[idx] }}</span>
+            <span class="text-[9px] text-fg-faint mt-1">{{ weekLabels[idx] }}</span>
           </div>
         </div>
       </section>
     </div>
 
-    <!-- 快捷入口 -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <!-- 快捷入口（图标底色统一品牌青不同透明度；AI 弱化置右，可设置隐藏） -->
+    <div class="grid grid-cols-1 gap-4" :class="quickCards.length === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-3'">
       <button
-        v-for="c in [
-          { title: 'dashboard.featureNotes', desc: 'dashboard.featureNotesDesc', to: '/notes', icon: 'i-carbon-document', hue: 'card-teal' },
-          { title: 'dashboard.featureTodos', desc: 'dashboard.featureTodosDesc', to: '/todos', icon: 'i-carbon-task', hue: 'card-blue' },
-          { title: 'dashboard.featureAi', desc: 'dashboard.featureAiDesc', to: '/ai', icon: 'i-carbon-ai-status', hue: 'card-violet' }
-        ]"
+        v-for="c in quickCards"
         :key="c.to"
         @click="router.push(c.to)"
         class="feature-card text-left p-4 rounded-2xl cursor-pointer"
       >
-        <span class="icon-chip grid place-items-center w-9 h-9 rounded-lg mb-3" :class="c.hue">
+        <span class="icon-chip grid place-items-center w-9 h-9 rounded-btn mb-3" :class="c.hue">
           <span :class="c.icon" class="text-lg" />
         </span>
         <div class="font-semibold text-sm">{{ t(c.title) }}</div>
@@ -288,6 +393,13 @@ function addProgress() {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+
+/* 顶栏实时时钟：弱化透明度，不与问候语抢视觉 */
+.clock-time {
+  color: var(--c-fg-faint);
+  opacity: 0.7;
+  font-weight: 500;
 }
 
 .action-btn {
@@ -321,9 +433,18 @@ function addProgress() {
   box-shadow: var(--shadow-sm);
 }
 
-/* .check / .check-done 已抽取到全局 theme.css（审查 M-23） */
-
-.empty { border: 1.5px dashed var(--c-border); }
+/* 空白态：浅灰实线 + 轻阴影 + hover 轻微上浮（规范：不用的虚线边框） */
+.empty {
+  border: 1px solid var(--c-border);
+  background: var(--c-surface);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
+}
+.empty:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+  border-color: var(--c-brand);
+}
 
 /* 分类芯片 */
 .cat-chip {
@@ -339,13 +460,13 @@ function addProgress() {
 }
 .dark .cat-daily { color: var(--c-brand); }
 
-/* 昨日遗留提示芯片（琥珀色突出） */
+/* 昨日遗留提示芯片（浅橙底、降饱和柔和不刺眼，规范：警告=橙黄） */
 .missed-chip {
-  background: #f59e0b1a;
-  color: #d97706;
+  background: rgba(245, 158, 11, 0.10);
+  color: #b45309;
   font-weight: 600;
 }
-.dark .missed-chip { background: #f59e0b26; color: #fbbf24; }
+.dark .missed-chip { background: rgba(245, 158, 11, 0.16); color: #fbbf24; }
 
 .stat-cell {
   background: var(--c-bg);
@@ -354,6 +475,10 @@ function addProgress() {
 
 .bar-track { background: var(--c-bg); }
 .bar-fill { background: var(--c-brand-grad); }
+.bar-fill-overdue { background: var(--c-warning); }
+/* 空日期：极浅灰占位柱 */
+.bar-empty-fill { height: 6px; background: rgba(120, 120, 120, 0.18); }
+.dark .bar-empty-fill { background: rgba(255, 255, 255, 0.10); }
 
 .feature-card {
   background: var(--c-surface);
@@ -362,15 +487,17 @@ function addProgress() {
   transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
 }
 .feature-card:hover {
-  transform: translateY(-2px);
+  transform: translateY(-3px);
   box-shadow: var(--shadow-md);
   border-color: var(--c-brand);
 }
 
-.icon-chip { color: #fff; }
-.card-teal { background: linear-gradient(135deg, #14b8a6, #0d9488); }
-.card-blue { background: linear-gradient(135deg, #38bdf8, #2563eb); }
-.card-violet { background: linear-gradient(135deg, #a78bfa, #7c3aed); }
+/* 快捷入口图标底色：统一品牌青不同透明度（禁用蓝 / 紫） */
+.icon-chip { border-radius: var(--radius); }
+.card-teal { background: var(--c-brand-grad); color: #fff; }
+.card-teal-soft { background: rgba(38, 166, 154, 0.28); color: var(--c-brand-strong); }
+.card-teal-dim { background: rgba(38, 166, 154, 0.12); color: var(--c-fg-faint); }
+.dark .card-teal-soft { color: #7fd8ce; }
 
 .list-enter-active, .list-leave-active { transition: transform 0.2s ease, opacity 0.2s ease; }
 .list-enter-from { opacity: 0; transform: translateY(-6px); }

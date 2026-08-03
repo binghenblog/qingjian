@@ -157,7 +157,7 @@ onMounted(() => {
         <button class="icon-btn md:hidden" @click="showSessions = !showSessions" :aria-label="t('ai.sessions')">
           <span class="i-carbon-list" />
         </button>
-        <span class="w-1.5 h-1.5 rounded-full" :class="settings.aiProvider === 'cloud' ? 'bg-sky-500' : 'bg-brand'" />
+        <span class="w-1.5 h-1.5 rounded-full" :class="settings.aiProvider === 'cloud' ? 'bg-brand-soft' : 'bg-brand'" />
         <span>{{ t('ai.channelPrefix') }}{{ channelLabel }}</span>
         <button
           v-if="messages.length"

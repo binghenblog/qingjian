@@ -18,6 +18,10 @@ interface SettingsState {
   locale: string
   /** 记账页是否显示「本周 / 本月」收支汇总（默认隐藏，由用户开关控制） */
   ledgerShowSummary: boolean
+  /** 是否在导航栏与今日桌面显示 AI 助手入口（AI 暂不开发，可隐藏） */
+  showAiEntry: boolean
+  /** 首页 Hero 横幅是否被收起（true=已收起不显示；设置页「恢复横幅」置回 false） */
+  dashboardHeroHidden: boolean
 }
 
 function load(): SettingsState {
@@ -28,7 +32,9 @@ function load(): SettingsState {
     aiModel: 'llama3',
     aiKeyRemember: false,
     locale: 'zh-CN',
-    ledgerShowSummary: false
+    ledgerShowSummary: false,
+    showAiEntry: false,
+    dashboardHeroHidden: false
   }
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -93,6 +99,8 @@ export const useSettingsStore = defineStore('settings', () => {
   const aiApiKey = ref(loadKey(s.aiKeyRemember))
   const locale = ref(s.locale)
   const ledgerShowSummary = ref(s.ledgerShowSummary)
+  const showAiEntry = ref(s.showAiEntry)
+  const dashboardHeroHidden = ref(s.dashboardHeroHidden)
 
   // 语言切换：写入 i18n 全局 locale，界面即时更新（审查 L-38）
   watch(locale, (code) => {
@@ -112,7 +120,9 @@ export const useSettingsStore = defineStore('settings', () => {
           aiModel: aiModel.value,
           aiKeyRemember: aiKeyRemember.value,
           locale: locale.value,
-          ledgerShowSummary: ledgerShowSummary.value
+          ledgerShowSummary: ledgerShowSummary.value,
+          showAiEntry: showAiEntry.value,
+          dashboardHeroHidden: dashboardHeroHidden.value
         })
       )
     } catch {
@@ -128,7 +138,7 @@ export const useSettingsStore = defineStore('settings', () => {
   if (typeof window !== 'undefined') {
     window.addEventListener('beforeunload', flush)
   }
-  watch([userName, aiProvider, aiBaseUrl, aiModel, aiKeyRemember, locale, ledgerShowSummary], () => {
+  watch([userName, aiProvider, aiBaseUrl, aiModel, aiKeyRemember, locale, ledgerShowSummary, showAiEntry, dashboardHeroHidden], () => {
     clearTimeout(settingsTimer)
     settingsTimer = window.setTimeout(persistNow, 200)
   })
@@ -136,5 +146,5 @@ export const useSettingsStore = defineStore('settings', () => {
   // Key 单独持久化，跟随「记住」开关迁移存储位置
   watch([aiApiKey, aiKeyRemember], () => persistKey(aiApiKey.value, aiKeyRemember.value))
 
-  return { userName, aiProvider, aiBaseUrl, aiApiKey, aiModel, aiKeyRemember, locale, ledgerShowSummary, flush }
+  return { userName, aiProvider, aiBaseUrl, aiApiKey, aiModel, aiKeyRemember, locale, ledgerShowSummary, showAiEntry, dashboardHeroHidden, flush }
 })

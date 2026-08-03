@@ -19,8 +19,9 @@ const routes: RouteRecordRaw[] = [
   { path: '/ledger', name: 'ledger', component: () => import('@/views/Ledger.vue'), meta: { titleKey: 'nav.ledger' } },
   { path: '/fitness', name: 'fitness', component: () => import('@/views/Fitness.vue'), meta: { titleKey: 'nav.fitness' } },
   { path: '/anniversaries', name: 'anniversaries', component: () => import('@/views/Anniversaries.vue'), meta: { titleKey: 'nav.anniversaries' } },
-  { path: '/quotes', name: 'quotes', component: () => import('@/views/Quotes.vue'), meta: { titleKey: 'nav.quotes' } },
   { path: '/settings', name: 'settings', component: () => import('@/views/Settings.vue'), meta: { titleKey: 'nav.settings' } },
+  // 记好句已并入笔记模块（2026-08-04）：旧 /quotes 链接重定向到笔记
+  { path: '/quotes', redirect: '/notes' },
   // 兜底：未知路径回仪表盘（审查 L-1）
   { path: '/:pathMatch(.*)*', redirect: '/' }
 ]

@@ -10,7 +10,9 @@ import { useFitnessStore } from '@/stores/fitness'
 import { useAnniversariesStore } from '@/stores/anniversaries'
 import { useQuotesStore } from '@/stores/quotes'
 import { useConfirm } from '@/composables/useConfirm'
+import { useToast } from '@/composables/useToast'
 import { exportToFile, readBackupFile, importBackup, type ImportMode } from '@/services/backup'
+import { appLogoDataUri } from '@/assets/logo'
 import { SUPPORTED_LOCALES } from '@/i18n'
 
 const { theme, setTheme } = useTheme()
@@ -23,6 +25,13 @@ const anniversariesStore = useAnniversariesStore()
 const quotesStore = useQuotesStore()
 const { t } = useI18n()
 const { confirm } = useConfirm()
+const toast = useToast()
+
+/** 恢复首页被收起的 Hero 横幅（审查 2026-08-04） */
+function restoreBanner() {
+  settings.dashboardHeroHidden = false
+  toast.success(t('settings.bannerRestored'))
+}
 
 onMounted(() => noteStore.load())
 
@@ -194,6 +203,25 @@ const locales = SUPPORTED_LOCALES
       </label>
     </section>
 
+    <!-- AI 入口显示 -->
+    <section class="setting-card rounded-2xl p-5">
+      <div class="font-semibold text-sm mb-1">{{ t('settings.aiEntry') }}</div>
+      <p class="text-xs text-fg-faint mt-0 mb-3">{{ t('settings.aiEntryHint') }}</p>
+      <label class="flex items-center gap-2 text-sm text-fg-soft cursor-pointer select-none">
+        <input v-model="settings.showAiEntry" type="checkbox" class="cursor-pointer" />
+        {{ t('settings.aiEntryToggle') }}
+      </label>
+    </section>
+
+    <!-- 首页横幅 -->
+    <section class="setting-card rounded-2xl p-5">
+      <div class="font-semibold text-sm mb-1">{{ t('settings.banner') }}</div>
+      <p class="text-xs text-fg-faint mt-0 mb-3">{{ t('settings.bannerHint') }}</p>
+      <button class="btn-primary px-4 py-2 rounded-xl text-sm" @click="restoreBanner">
+        {{ t('settings.restoreBanner') }}
+      </button>
+    </section>
+
     <!-- AI 通道 -->
     <section class="setting-card rounded-2xl p-5 space-y-4">
       <div>
@@ -310,7 +338,7 @@ const locales = SUPPORTED_LOCALES
 
     <!-- 关于 -->
     <section class="setting-card rounded-2xl p-5 flex items-center gap-4">
-      <span class="logo w-11 h-11 rounded-xl grid place-items-center text-white text-lg font-bold shrink-0">青</span>
+      <img :src="appLogoDataUri" alt="青简" class="w-11 h-11 rounded-xl object-cover shrink-0 ring-1 ring-border/50 shadow-sm" />
       <div>
         <div class="font-semibold text-sm">{{ t('app.name') }} QingJian</div>
         <div class="text-xs text-fg-faint mt-0.5">{{ t('about.desc', { version: t('app.version') }) }}</div>
@@ -359,11 +387,6 @@ const locales = SUPPORTED_LOCALES
   box-shadow: var(--shadow-sm);
 }
 .dark .seg-active { color: var(--c-brand); }
-
-.logo {
-  background: var(--c-brand-grad);
-  box-shadow: 0 4px 12px var(--c-brand-soft);
-}
 
 /* 数据管理按钮 */
 .data-btn {

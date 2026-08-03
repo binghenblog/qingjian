@@ -19,6 +19,15 @@ export function useShortcuts() {
   const router = useRouter()
 
   function onKeydown(e: KeyboardEvent) {
+    // Ctrl/Cmd+N：快速新建任务（桌面端专属；输入框聚焦时不拦截，避免打断输入）
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n') {
+      const el = e.target as HTMLElement | null
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return
+      if (document.querySelector('.palette-mask, .confirm-mask')) return
+      e.preventDefault()
+      router.push('/todos')
+      return
+    }
     if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return
     // 输入框 / 可编辑区聚焦时不拦截，避免误触导航（审查 L-4）
     const el = e.target as HTMLElement | null
