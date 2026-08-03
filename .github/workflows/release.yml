@@ -158,6 +158,18 @@ jobs:
               --key-pass "pass:${{ secrets.KEY_PASSWORD }}" \
               "$apk"
           done
+      # 重命名为清晰的名字（tauri 默认名带误导性的 "unsigned" 后缀；
+      # apksigner 原地覆盖不重命名，这里统一改成 qingjian_<版本>_arm64.apk）
+      - name: Rename APK
+        run: |
+          mkdir -p dist-apk
+          VER="${{ github.ref_name }}"
+          VER="${VER#v}"
+          for apk in src-tauri/gen/android/app/build/outputs/apk/universal/release/*.apk; do
+            [ -f "$apk" ] || continue
+            cp "$apk" "dist-apk/qingjian_${VER}_arm64.apk"
+            echo "Renamed to dist-apk/qingjian_${VER}_arm64.apk"
+          done
       # 上传 APK 到 Release
       - name: Upload APK to Release
         uses: softprops/action-gh-release@v2
@@ -166,4 +178,4 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           files: |
-            src-tauri/gen/android/app/build/outputs/apk/universal/release/*.apk
+            dist-apk/*.apk
