@@ -73,6 +73,11 @@ jobs:
       - name: Set up Android SDK
         id: setup-android
         uses: android-actions/setup-android@v3
+      - name: Capture Android home path
+        # setup-android 将 ANDROID_HOME 设为 shell 环境变量，但其 action 输出名并非
+        # android-home（引用为空会拼出 /ndk/... 的断路径）。故在 shell 中捕获到
+        # $GITHUB_ENV，供后续步骤的 env: 表达式与 PATH 软链复用。
+        run: echo "ANDROID_HOME_DIR=${ANDROID_HOME:-$HOME/Android/Sdk}" >> "$GITHUB_ENV"
       - name: Install Android SDK components
         run: sdkmanager "platforms;android-34" "build-tools;34.0.0" "ndk;25.2.9519653"
       - name: Link NDK clang into PATH
@@ -80,7 +85,7 @@ jobs:
         # 而 NDK 的 clang 实际叫 aarch64-linux-android34-clang（带 API 版本号），
         # 故建立不带版本号的软链并加入 PATH（同时供 Rust 标准库链接器使用）。
         run: |
-          NDK_BIN="${{ steps.setup-android.outputs.android-home }}/ndk/25.2.9519653/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          NDK_BIN="$ANDROID_HOME_DIR/ndk/25.2.9519653/toolchains/llvm/prebuilt/linux-x86_64/bin"
           mkdir -p "$HOME/ndk-bin"
           ln -sf "$NDK_BIN/aarch64-linux-android34-clang" "$HOME/ndk-bin/aarch64-linux-android-clang"
           ln -sf "$NDK_BIN/aarch64-linux-android34-clang++" "$HOME/ndk-bin/aarch64-linux-android-clang++"
@@ -94,12 +99,12 @@ jobs:
         uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NDK_HOME: ${{ steps.setup-android.outputs.android-home }}/ndk/25.2.9519653
-          ANDROID_NDK_HOME: ${{ steps.setup-android.outputs.android-home }}/ndk/25.2.9519653
+          NDK_HOME: ${{ env.ANDROID_HOME_DIR }}/ndk/25.2.9519653
+          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME_DIR }}/ndk/25.2.9519653
           # cc-rs / Rust 交叉编译工具链需要显式指明 NDK clang 路径（双保险，避免找不到 aarch64-linux-android-clang）
-          CC_aarch64_linux_android: ${{ steps.setup-android.outputs.android-home }}/ndk/25.2.9519653/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android34-clang
-          CXX_aarch64_linux_android: ${{ steps.setup-android.outputs.android-home }}/ndk/25.2.9519653/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android34-clang++
-          AR_aarch64_linux_android: ${{ steps.setup-android.outputs.android-home }}/ndk/25.2.9519653/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
+          CC_aarch64_linux_android: ${{ env.ANDROID_HOME_DIR }}/ndk/25.2.9519653/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android34-clang
+          CXX_aarch64_linux_android: ${{ env.ANDROID_HOME_DIR }}/ndk/25.2.9519653/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android34-clang++
+          AR_aarch64_linux_android: ${{ env.ANDROID_HOME_DIR }}/ndk/25.2.9519653/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
           # 签名（可选，未配置 Secrets 时用 debug key 构建）
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
