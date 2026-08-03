@@ -84,8 +84,10 @@ jobs:
       - name: Locate NDK and link clang into PATH
         # 关键点：不要硬编码 NDK 路径。先定位真实安装的 NDK 目录，再探测其 clang 名称
         #（不同 NDK 版本带/不带 API 版本号，如 aarch64-linux-android34-clang），
-        # 建立不带版本号的软链 aarch64-linux-android-clang 加入 PATH，
-        # 供 ring@0.17.14 的 cc-rs 与 Rust 标准库链接器识别。
+        # 建立「不带版本号」的符号链接供 cc-rs 与 Rust 链接器识别。
+        # 注意：NDK 的 clang 是包装脚本，内部用 $(dirname "$0")/clang 定位真正的编译器，
+        # 故软链必须建在 NDK bin 目录内（而非单独的 ndk-bin 目录），否则 $0 的 dirname 错位、
+        # 找不到 clang。同时把整个 NDK bin 目录加入 PATH，供 Rust 最终链接（clang/ld.lld/llvm-ar）。
         run: |
           set -euo pipefail
           AH="${ANDROID_HOME_DIR:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
@@ -100,17 +102,19 @@ jobs:
           echo "ANDROID_NDK_DIR=${NDK_DIR%/}" >> "$GITHUB_ENV"
           echo "Resolved NDK dir: $NDK_DIR"
           NDK_BIN="$NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          CLANG="$(ls "$NDK_BIN"/aarch64-linux-android*-clang 2>/dev/null | head -n1 || true)"
-          CLANGXX="$(ls "$NDK_BIN"/aarch64-linux-android*-clang++ 2>/dev/null | head -n1 || true)"
-          if [ -z "$CLANG" ] || [ ! -e "$CLANG" ]; then
+          CLANG_REL="$(ls "$NDK_BIN"/aarch64-linux-android*-clang 2>/dev/null | grep -v 'clang++' | head -n1 | xargs -n1 basename || true)"
+          CLANGXX_REL="$(ls "$NDK_BIN"/aarch64-linux-android*-clang++ 2>/dev/null | head -n1 | xargs -n1 basename || true)"
+          if [ -z "$CLANG_REL" ]; then
             echo "::error::NDK clang not found under $NDK_BIN"; ls -la "$NDK_BIN" || true; exit 1
           fi
-          echo "Using NDK clang: $CLANG"
-          mkdir -p "$HOME/ndk-bin"
-          ln -sf "$CLANG" "$HOME/ndk-bin/aarch64-linux-android-clang"
-          ln -sf "$CLANGXX" "$HOME/ndk-bin/aarch64-linux-android-clang++"
-          ln -sf "$NDK_BIN/llvm-ar" "$HOME/ndk-bin/aarch64-linux-android-ar"
-          echo "$HOME/ndk-bin" >> "$GITHUB_PATH"
+          echo "Using NDK clang: $CLANG_REL"
+          # 在 NDK bin 目录内建立不带版本号的符号链接（相对路径，dir 不变，包装脚本可正确定位 clang）
+          ln -sf "$CLANG_REL" "$NDK_BIN/aarch64-linux-android-clang"
+          ln -sf "$CLANGXX_REL" "$NDK_BIN/aarch64-linux-android-clang++"
+          ln -sf llvm-ar "$NDK_BIN/aarch64-linux-android-ar"
+          # 把 NDK bin 加入 PATH：cc-rs 按 aarch64-linux-android-clang 找编译器，
+          # rustc 链接阶段还需 clang / ld.lld / llvm-ar（均位于 NDK bin）。
+          echo "$NDK_BIN" >> "$GITHUB_PATH"
       - name: Decode signing keystore
         if: env.KEYSTORE_SET == 'true'
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android.keystore
