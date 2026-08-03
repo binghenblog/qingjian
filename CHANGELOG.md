@@ -4,6 +4,18 @@ All notable changes to 青简 (QingJian) are documented here.
 
 The project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.3.1] - 2026-08-03
+
+v0.3.1 是修复版：核心是修复 Android APK 交叉编译链接失败（经 Gradle 调起 cargo 时 linker 回落宿主 gcc），并同步对齐构建依赖版本；同时完成一轮无障碍 / i18n / 数据健壮性修复，补充 AI 服务安全单测。
+
+### Fixed
+- **Android APK 交叉编译链接（CI）**：Tauri 的 android 构建经 Gradle 插件调起 cargo（`pnpm tauri android android-studio-script`），Gradle daemon 不继承 CI 步骤的 `CARGO_TARGET_*_LINKER` 环境变量，导致 rustc 链接 cdylib 时回落宿主 `gcc(cc)`、缺 Android sysroot 而报 `unable to find library -landroid/-llog/-lunwind`。改为仓库根 `.cargo/config.toml` 为 4 个 Android target 指定 NDK clang 作 linker（armv7 用 NDK 侧名 `armv7a-linux-androideabi-clang`），cargo 无论从哪条路径被调用都会读取；`release.yml` 软链步骤覆盖全部 4 个 ABI，并移除已失效的 `CARGO_TARGET_*_LINKER` env。
+- **SDK 平台版本对齐（CI）**：gen/android 工程 `compileSdk=36`，CI 原装 `android-34` 会在 AGP 阶段报 `failed to find target SDK 36`，改为 `platforms;android-36` + `build-tools;36.0.0`。
+- **无障碍 / i18n 一致性**：Dashboard 待办完成 `aria-label` 改走 i18n；FAB 缺省 `aria-label` 用 `common.add`；纪念日/好句表单 Esc 改全局监听，焦点在表单外也能关闭。
+- **记账分类交互**：由可手输的 datalist 改为预设 chips 单选，与 `TX_CATEGORIES` 预设一致，避免自由分类无法再编辑。
+- **数据健壮性**：备份校验对新增表（transactions/workouts/weights/anniversaries/quotes）元素补 `id` 校验，避免 IndexedDB 主键缺失写入异常；Notes 内容预览改分步清洗 markdown 符号。
+- **AI 服务单测**：新增 `ai.test.ts` 覆盖 `assertSafeUrl` SSRF 绕过向量、SSE/ndjson 流式解析、401/429 错误分支、空 Key 不携带 Authorization、`isTauri` 环境判定；`useAiStore` 暴露 `needsKey` 供 AI 视图复用（原定义未导出）。
+
 ## [0.3.0] - 2026-08-03
 
 v0.3.0 是继 v0.2.0 之后的功能与健壮性大版本：新增多个生活模块、重做导航与备份、接入 AI × 本地数据上下文，并系统性修复了三轮安全/可访问性审查发现的问题（含 Rust 后端编译验证通过）。
@@ -40,5 +52,6 @@ v0.3.0 是继 v0.2.0 之后的功能与健壮性大版本：新增多个生活�
 - 全站 UI 文案经 vue-i18n 渲染。
 - 多轮安全/稳定性审查修复（Critical/High/Medium/Low）。
 
+[0.3.1]: https://github.com/binghenblog/qingjian/releases/tag/v0.3.1
 [0.3.0]: https://github.com/binghenblog/qingjian/releases/tag/v0.3.0
 [0.2.0]: https://github.com/binghenblog/qingjian/releases/tag/v0.2.0

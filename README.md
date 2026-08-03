@@ -10,7 +10,7 @@
 
 <p align="center">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-blue.svg" />
-  <img alt="Version" src="https://img.shields.io/badge/version-0.3.0-orange.svg" />
+  <img alt="Version" src="https://img.shields.io/badge/version-0.3.1-orange.svg" />
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS%20%7C%20Android-2ea043.svg" />
   <img alt="Stack" src="https://img.shields.io/badge/stack-Vue%203%20%2B%20Tauri%20v2-42b883.svg" />
 </p>
@@ -189,7 +189,7 @@ qingjian/
 ## 📰 更新日志
 
 - 完整变更记录见 [CHANGELOG.md](CHANGELOG.md)。
-- 最新发布：**[v0.3.0](https://github.com/binghenblog/qingjian/releases/tag/v0.3.0)** —— 新增健身 / 记账 / 纪念日 / 记好句模块，AI × 本地数据上下文，左侧抽屉导航；并系统性修复安全与可访问性（详见 CHANGELOG）。GitHub Release 含 Windows / Linux 安装包。
+- 最新发布：**[v0.3.1](https://github.com/binghenblog/qingjian/releases/tag/v0.3.1)** —— 修复 Android APK 交叉编译链接（`.cargo/config.toml` 指定 NDK clang 作 linker）、对齐 SDK 平台版本；并完成一轮无障碍 / i18n / 数据健壮性修复（详见 CHANGELOG）。GitHub Release 含 Windows / Linux 安装包与 Android APK。
 
 ---
 

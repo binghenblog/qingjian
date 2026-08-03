@@ -5,7 +5,7 @@ export default {
     name: 'QingJian',
     tagline: 'Personal Workbench',
     footer: 'Local-first · Your data stays with you',
-    version: 'v0.3.0'
+    version: 'v0.3.1'
   },
   common: {
     confirm: 'Confirm',
