@@ -74,21 +74,41 @@ jobs:
         id: setup-android
         uses: android-actions/setup-android@v3
       - name: Capture Android home path
-        # setup-android 将 ANDROID_HOME 设为 shell 环境变量，但其 action 输出名并非
-        # android-home（引用为空会拼出 /ndk/... 的断路径）。故在 shell 中捕获到
-        # $GITHUB_ENV，供后续步骤的 env: 表达式与 PATH 软链复用。
+        # setup-android 将 ANDROID_HOME 设为 shell 环境变量（无稳定的 action 输出名），
+        # 故在 shell 中捕获到 $GITHUB_ENV 供后续步骤复用。
         run: echo "ANDROID_HOME_DIR=${ANDROID_HOME:-$HOME/Android/Sdk}" >> "$GITHUB_ENV"
       - name: Install Android SDK components
-        run: sdkmanager "platforms;android-34" "build-tools;34.0.0" "ndk;25.2.9519653"
-      - name: Link NDK clang into PATH
-        # cc-rs 按 aarch64-linux-android-clang 这个名字在 PATH 上找编译器，
-        # 而 NDK 的 clang 实际叫 aarch64-linux-android34-clang（带 API 版本号），
-        # 故建立不带版本号的软链并加入 PATH（同时供 Rust 标准库链接器使用）。
+        # setup-android 已 sdkmanager --licenses 接受许可，此处用 yes | 兜底非交互安装
         run: |
-          NDK_BIN="$ANDROID_HOME_DIR/ndk/25.2.9519653/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          yes | sdkmanager "platforms;android-34" "build-tools;34.0.0" "ndk;25.2.9519653"
+      - name: Locate NDK and link clang into PATH
+        # 关键点：不要硬编码 NDK 路径。先定位真实安装的 NDK 目录，再探测其 clang 名称
+        #（不同 NDK 版本带/不带 API 版本号，如 aarch64-linux-android34-clang），
+        # 建立不带版本号的软链 aarch64-linux-android-clang 加入 PATH，
+        # 供 ring@0.17.14 的 cc-rs 与 Rust 标准库链接器识别。
+        run: |
+          set -euo pipefail
+          AH="${ANDROID_HOME_DIR:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          if [ -d "$AH/ndk/25.2.9519653" ]; then
+            NDK_DIR="$AH/ndk/25.2.9519653"
+          else
+            NDK_DIR="$(ls -d "$AH"/ndk/*/ 2>/dev/null | head -n1 || true)"
+          fi
+          if [ -z "$NDK_DIR" ]; then
+            echo "::error::No NDK installation found under $AH/ndk"; exit 1
+          fi
+          echo "ANDROID_NDK_DIR=${NDK_DIR%/}" >> "$GITHUB_ENV"
+          echo "Resolved NDK dir: $NDK_DIR"
+          NDK_BIN="$NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          CLANG="$(ls "$NDK_BIN"/aarch64-linux-android*-clang 2>/dev/null | head -n1 || true)"
+          CLANGXX="$(ls "$NDK_BIN"/aarch64-linux-android*-clang++ 2>/dev/null | head -n1 || true)"
+          if [ -z "$CLANG" ] || [ ! -e "$CLANG" ]; then
+            echo "::error::NDK clang not found under $NDK_BIN"; ls -la "$NDK_BIN" || true; exit 1
+          fi
+          echo "Using NDK clang: $CLANG"
           mkdir -p "$HOME/ndk-bin"
-          ln -sf "$NDK_BIN/aarch64-linux-android34-clang" "$HOME/ndk-bin/aarch64-linux-android-clang"
-          ln -sf "$NDK_BIN/aarch64-linux-android34-clang++" "$HOME/ndk-bin/aarch64-linux-android-clang++"
+          ln -sf "$CLANG" "$HOME/ndk-bin/aarch64-linux-android-clang"
+          ln -sf "$CLANGXX" "$HOME/ndk-bin/aarch64-linux-android-clang++"
           ln -sf "$NDK_BIN/llvm-ar" "$HOME/ndk-bin/aarch64-linux-android-ar"
           echo "$HOME/ndk-bin" >> "$GITHUB_PATH"
       - name: Decode signing keystore
@@ -99,12 +119,13 @@ jobs:
         uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NDK_HOME: ${{ env.ANDROID_HOME_DIR }}/ndk/25.2.9519653
-          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME_DIR }}/ndk/25.2.9519653
-          # cc-rs / Rust 交叉编译工具链需要显式指明 NDK clang 路径（双保险，避免找不到 aarch64-linux-android-clang）
-          CC_aarch64_linux_android: ${{ env.ANDROID_HOME_DIR }}/ndk/25.2.9519653/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android34-clang
-          CXX_aarch64_linux_android: ${{ env.ANDROID_HOME_DIR }}/ndk/25.2.9519653/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android34-clang++
-          AR_aarch64_linux_android: ${{ env.ANDROID_HOME_DIR }}/ndk/25.2.9519653/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
+          NDK_HOME: ${{ env.ANDROID_NDK_DIR }}
+          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_DIR }}
+          # cc-rs / Rust 交叉编译工具链按 aarch64-linux-android-clang（不带版本号）在 PATH 上找编译器；
+          # 该名字已由上一步入 PATH 的软链提供，这里再显式声明双保险。
+          CC_aarch64_linux_android: aarch64-linux-android-clang
+          CXX_aarch64_linux_android: aarch64-linux-android-clang++
+          AR_aarch64_linux_android: aarch64-linux-android-ar
           # 签名（可选，未配置 Secrets 时用 debug key 构建）
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
