@@ -131,23 +131,26 @@ jobs:
         if: env.KEYSTORE_SET == 'true'
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android.keystore
       - run: pnpm install --frozen-lockfile
-      - name: Tauri Android build
-        uses: tauri-apps/tauri-action@v1
+      # Android 出包必须用 `tauri android build`（gradle 流程），不能用 tauri-action 的
+      # `tauri build --target ...`——后者在 bundle 阶段报 "Native android bundles not yet supported"。
+      # rust 侧 linker 已由仓库根 .cargo/config.toml 配置（NDK clang），gradle 经 BuildTask.kt
+      # 调 cargo 时同样读取；NDK_HOME 供 gradle 定位 NDK。
+      - name: Build Android APK
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NDK_HOME: ${{ env.ANDROID_NDK_DIR }}
           ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_DIR }}
-          # rustc 最终链接 cdylib（libqingjian_lib.so）的 linker 已由仓库根 .cargo/config.toml
-          # 配置（[target.*].linker 指向 NDK bin 内无版本号软链名），cargo 无论从 gradle 还是
-          # 直接调用都会读取，不依赖环境变量透传（Gradle daemon 不继承此步骤的自定义 env）。
-          # 此处仅保留 cc-rs / build script（如 ring）需要的编译器名，作 PATH 兜底。
-          CC_aarch64_linux_android: aarch64-linux-android-clang
-          CXX_aarch64_linux_android: aarch64-linux-android-clang++
-          AR_aarch64_linux_android: aarch64-linux-android-ar
+          ANDROID_HOME: ${{ env.ANDROID_HOME_DIR }}
           # 签名（可选，未配置 Secrets 时用 debug key 构建）
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          pnpm tauri android build --apk --ci -t aarch64
+      # 上传 APK 到 Release（无论是否配置签名 Secrets，tauri 都会产出 apk；debug key 版可直接安装）
+      - name: Upload APK to Release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: '青简 ${{ github.ref_name }}'
-          args: --target aarch64-linux-android
+          tag_name: ${{ github.ref_name }}
+          files: |
+            src-tauri/gen/android/app/build/outputs/apk/**/*.apk
