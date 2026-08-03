@@ -76,6 +76,12 @@ export const useAiStore = defineStore('ai', () => {
     loaded.value = true
   }
 
+  /** 强制重新加载会话（审查 M-4）：供备份导入后调用，刷新 UI 中新增/变更的 chats */
+  async function reload() {
+    loaded.value = false
+    await load()
+  }
+
   const current = computed(() => sessions.value.find((s) => s.id === currentId.value) ?? null)
 
   function selectSession(id: string) {
@@ -235,6 +241,7 @@ export const useAiStore = defineStore('ai', () => {
     send,
     stop,
     askWithContext,
-    scheduleSave
+    scheduleSave,
+    reload
   }
 })

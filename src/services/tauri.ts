@@ -41,6 +41,8 @@ async function* tauriChat(
   // 动态导入，确保 Web 构建不依赖 @tauri-apps/api（未安装）
   const core = await import('@tauri-apps/api/core')
   const channel = new core.Channel<string>()
+  // 本次请求的唯一标识，用于 Rust 端按 id 精确取消（审查 M-7）
+  const requestId = crypto.randomUUID()
 
   const queue: string[] = []
   let finished = false
@@ -60,9 +62,9 @@ async function* tauriChat(
       () => {
         aborted = true
         finished = true
-        // 通知 Rust 端中止正在进行的 HTTP 流（审查 H-8）
+        // 通知 Rust 端中止指定请求的 HTTP 流（审查 H-8 / M-7）
         core
-          .invoke('cancel-ai-chat')
+          .invoke('cancel-ai-chat', { request_id: requestId })
           .catch(() => {})
         resolveWait()
       },
@@ -73,6 +75,7 @@ async function* tauriChat(
   const invokeP = core.invoke('ai-chat', {
     config: { base_url: cfg.baseUrl, api_key: cfg.apiKey, model: cfg.model },
     messages: messages.map((m) => ({ role: m.role as ChatRole, content: m.content })),
+    request_id: requestId,
     on_token: channel
   })
 
