@@ -4,6 +4,29 @@ All notable changes to 青简 (QingJian) are documented here.
 
 The project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.0] - 2026-08-03
+
+v0.6.0 是移动端体验与交互打磨版：全面适配移动端系统状态栏 / 手势条安全区、按钮体系统一为扁平无阴影、移除笔记页好句子模块、新增全局快捷键开关，并修复一批 i18n 与可访问性问题。
+
+### Added
+- **系统安全区适配**：`viewport-fit=cover` + CSS `env(safe-area-inset-*)` 变量，主内容区 / 底部 Tab / FAB / 底部 ActionSheet 自动避开系统状态栏与手势条（Tauri 移动端 edge-to-edge）。
+- **全局快捷键开关**：设置页「快捷键」新增启用开关（默认关闭），控制 Alt+1~5 页面切换、Ctrl/Cmd+K 命令面板、Ctrl/Cmd+N 快速新建；移动端（<1024px）隐藏快捷键区块。
+
+### Changed
+- **按钮体系扁平化**：`btn-primary` / `btn-secondary` / `btn-danger` 及各页自定义按钮统一为扁平无阴影风格（纯色 / 描边 + hover 淡底），去掉投影与位移反馈。
+- **首页横幅 CTA 醒目化**：主按钮改为白色实底 + 深青加粗文字，深色横幅上对比更清晰。
+- **顶部标题栏移除**：删除各模块顶部的页标题栏（header），内容区直接从顶部开始；页面内 h2 标题保留。
+- **空状态统一**：新增 `EmptyState` 组件（完整 / compact 两模式），替换各页零散空态。
+- **移动端 Tab 选中标注**：激活态增加顶部品牌指示条，与桌面端左侧竖条对应。
+
+### Removed
+- **好句（Quotes）子模块**：移除笔记页「笔记 / 好句」切换与好句 UI（数据层保留，已有数据不丢失）。
+
+### Fixed
+- **i18n HTML 警告**：`notes.emptyHint` / `ai.emptyHint` 消息中的内联 HTML 拆为纯文本 `emptyHint` + `emptyHintSub`，消除 vue-i18n 的 XSS 提示，并清理 `notes.tabQuotes` 死 key。
+- **FAB 遮挡底部 Tab**：悬浮按钮上移并计入 safe-area，不再遮挡移动端 Tab 栏。
+- **弹窗遮罩统一**：新增 `--c-overlay` 变量，ConfirmDialog / BaseModal / CommandPalette / ActionSheet 遮罩颜色统一。
+
 ## [0.5.0] - 2026-08-03
 
 v0.5.0 是图标统一与打包体验修复版：把 Web / 桌面 / 移动三端的应用图标与品牌标识拉齐，并修复「打包后的 exe / apk 安装后导航栏图标不显示」问题。
@@ -69,6 +92,7 @@ v0.3.0 是继 v0.2.0 之后的功能与健壮性大版本：新增多个生活�
 - 全站 UI 文案经 vue-i18n 渲染。
 - 多轮安全/稳定性审查修复（Critical/High/Medium/Low）。
 
+[0.6.0]: https://github.com/binghenblog/qingjian/releases/tag/v0.6.0
 [0.5.0]: https://github.com/binghenblog/qingjian/releases/tag/v0.5.0
 [0.4.0]: https://github.com/binghenblog/qingjian/releases/tag/v0.4.0
 [0.3.0]: https://github.com/binghenblog/qingjian/releases/tag/v0.3.0

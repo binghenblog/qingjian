@@ -10,7 +10,7 @@
 
 <p align="center">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-blue.svg" />
-  <img alt="Version" src="https://img.shields.io/badge/version-0.5.0-orange.svg" />
+  <img alt="Version" src="https://img.shields.io/badge/version-0.6.0-orange.svg" />
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS%20%7C%20Android-2ea043.svg" />
   <img alt="Stack" src="https://img.shields.io/badge/stack-Vue%203%20%2B%20Tauri%20v2-42b883.svg" />
 </p>
@@ -201,7 +201,7 @@ qingjian/
 ## 📰 更新日志
 
 - 完整变更记录见 [CHANGELOG.md](CHANGELOG.md)。
-- 最新发布：**[v0.5.0](https://github.com/binghenblog/qingjian/releases/tag/v0.5.0)** —— 统一 Web / 桌面 / 移动三端应用图标（Tauri `tauri icon` 生成桌面与 Android 图标集、Web favicon 三件套），并将导航栏与设置页品牌 logo 改为内联 `data:` URI，修复打包后的 exe / apk 安装后导航栏图标不显示的问题。详见 [CHANGELOG.md](CHANGELOG.md)。GitHub Release 含 Windows / Linux 安装包与 Android APK。
+- 最新发布：**[v0.6.0](https://github.com/binghenblog/qingjian/releases/tag/v0.6.0)** —— 移动端体验打磨：系统状态栏 / 手势条安全区适配、按钮体系扁平化、移除好句子模块、新增全局快捷键开关、顶部标题栏移除。详见 [CHANGELOG.md](CHANGELOG.md)。GitHub Release 含 Windows / Linux 安装包与 Android APK。
 
 ---
 

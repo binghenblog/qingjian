@@ -37,10 +37,15 @@ qingjian-data/
 # WorkBuddy 项目记忆（工具数据，不入库）
 .workbuddy/
 
+# Claude Code 本地工具数据（launch 配置、任务锁等，不入库）
+.claude/
+
 # Vite/临时文件
 *.timestamp-*.mjs
 _tmp_*
 .tmp/
+*.vite-dev.log
+.vite-dev.log
 
 
 

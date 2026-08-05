@@ -1,6 +1,6 @@
 {
   "name": "qingjian",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "description": "青简 - 轻量、现代、开源、本地优先的个人工作台，原生支持 AI",

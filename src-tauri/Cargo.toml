@@ -1,6 +1,6 @@
 [package]
 name = "qingjian"
-version = "0.5.0"
+version = "0.6.0"
 description = "青简 - 轻量、现代、开源、本地优先的个人工作台"
 authors = ["青简"]
 edition = "2021"
@@ -26,6 +26,13 @@ futures-util = "0.3"
 # SSRF 防护（审查 H-1）：spawn_blocking 做阻塞式 DNS 解析、time::timeout 做流式分块超时（L-3），
 # 复用 tauri 已引入的 tokio 1.x，仅开启所需特性。
 tokio = { version = "1", features = ["rt", "time"] }
+# API Key 安全托管（审查 R-1）：桌面端把 Key 存进系统凭据库（Windows Credential Manager /
+# macOS Keychain / Linux Secret Service + keyutils），ai-chat 不再接收前端明文 Key。
+# 仅桌面平台启用：Android/iOS 编译期排除（凭据库后端不适用），该平台回退到前端直传。
+# Linux 特性说明：linux-native 基于 kernel keyutils（无系统库依赖，Ubuntu CI 无需额外 apt）；
+# sync-secret-service 提供持久化 Secret Service 后端（需要 D-Bus，桌面发行版均有）。
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+keyring = { version = "3", features = ["apple-native", "windows-native", "linux-native", "sync-secret-service"] }
 
 [features]
 # 默认不启用自定义协议
