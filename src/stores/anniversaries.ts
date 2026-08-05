@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { anniversaryStorage } from '@/services/storage'
+import { anniversaryRepository as anniversaryStorage } from '@/db'
 import type { Anniversary } from '@/types'
 
 /**

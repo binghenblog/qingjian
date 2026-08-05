@@ -1,34 +1,31 @@
 import { defineStore } from 'pinia'
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import type { TodoRecord, TodoPriority } from '@/types'
 import { DAILY_CATEGORY } from '@/types'
+import { todoRepository, todoCategoryRepository, isStorageAvailable } from '@/db'
+import { le } from '@/i18n/errors'
 
 /**
  * 待办 Store（分类版）
  * - 预设分类：每日 / 生活 / 工作 / 学习 / 游戏，支持自定义追加
  * - 「每日」分类为循环任务：完成状态按日期记录（doneDates），每天自动重置
- * - localStorage 持久化；M4 统一切换为 StorageAdapter（SQLite / Dexie）
+ * - 持久化统一经由数据访问层（src/db）：待办存 todos 表、分类存 todoCategories 表
+ *   （早期版本曾直接用裸 localStorage，自 v0.6 起迁入 DAL，详见 db/index.ts）
+ *
+ * 与笔记等模块保持一致：store 初始化时内存态为空，由 `load()` 异步从 DAL 载入；
+ * `main.ts` 已在挂载前预加载，组件可同步读取 `todos` 而无需等待。
  */
-const STORAGE_KEY = 'qingjian.todos'
-const CATEGORY_KEY = 'qingjian.todo-categories'
-const VERSION_KEY = 'qingjian.todos-version'
-
-/** 当前待办数据结构版本（审查 H-6：版本化迁移，替代无版本的内联兜底） */
 export const TODOS_VERSION = 2
 
-/**
- * 逐版本迁移链：schema 每次变更就追加一个 from→from+1 的迁移函数。
- * v1 → v2：补 category（历史任务归「生活」）、每日任务补 doneDates
- */
+/** 逐版本迁移链：schema 每次变更就追加一个 from→from+1 的迁移函数。
+ * v1 → v2：补 category（历史任务归「生活」）、每日任务补 doneDates */
 const MIGRATIONS: Record<number, (list: TodoRecord[]) => TodoRecord[]> = {
   1: (list) =>
     list.map((t) => ({
       ...t,
       category: t.category || '生活',
       doneDates:
-        (t.category || '生活') === DAILY_CATEGORY && !Array.isArray(t.doneDates)
-          ? []
-          : t.doneDates
+        (t.category || '生活') === DAILY_CATEGORY && !Array.isArray(t.doneDates) ? [] : t.doneDates
     }))
 }
 
@@ -55,7 +52,7 @@ export function dateKey(d = new Date()): string {
 
 /**
  * 计算给定 YYYY-MM-DD 的前一天（纯日历日运算，DST 安全）。
- * 以正午为锚点创建 Date，规避春令时「当天不存在 00:00」的边界（审查 L-28）。
+ * 以正午为锚点创建 Date，规避春令时「当天不存在 00:00」的边界。
  */
 export function prevDayKey(key: string): string {
   const [y, m, d] = key.split('-').map(Number)
@@ -75,90 +72,75 @@ export function dateKeyDaysAgo(n: number): string {
   return dateKey(d)
 }
 
-function loadTodos(): TodoRecord[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) {
-      localStorage.setItem(VERSION_KEY, String(TODOS_VERSION))
-      return []
-    }
-    const list = JSON.parse(raw) as TodoRecord[]
-    if (!Array.isArray(list)) return []
-    const stored = Number(localStorage.getItem(VERSION_KEY)) || 1
-    if (stored >= TODOS_VERSION) return list
-    const migrated = migrateTodos(list, stored)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated))
-    localStorage.setItem(VERSION_KEY, String(TODOS_VERSION))
-    return migrated
-  } catch (e) {
-    // 加载失败不应静默吞掉：至少记录，便于排查数据损坏（审查 L-35）
-    console.error('[todos] 读取本地待办失败', e)
-    return []
-  }
-}
-
-function loadCategories(): string[] {
-  try {
-    const raw = localStorage.getItem(CATEGORY_KEY)
-    const list = raw ? (JSON.parse(raw) as string[]) : []
-    // 预设分类始终在前且不可缺失
-    return [...PRESET_CATEGORIES, ...list.filter((c) => !PRESET_CATEGORIES.includes(c))]
-  } catch {
-    return [...PRESET_CATEGORIES]
-  }
+/** 剥离 Vue 响应式 Proxy，避免 IndexedDB 结构化克隆失败 */
+function toPlain(t: TodoRecord): TodoRecord {
+  return { ...t, doneDates: t.doneDates ? [...t.doneDates] : t.doneDates }
 }
 
 export const useTodoStore = defineStore('todos', () => {
-  const todos = ref<TodoRecord[]>(loadTodos())
-  const categories = ref<string[]>(loadCategories())
+  const todos = ref<TodoRecord[]>([])
+  const categories = ref<string[]>([...PRESET_CATEGORIES])
+  const loaded = ref(false)
+  /** 加载失败信息（IndexedDB 不可用等），供 UI 降级提示而非白屏 */
+  const loadError = ref<string | null>(null)
 
-  // 持久化防抖 200ms：高频操作（连续勾选/编辑）合并为一次写入（审查 L-7）
-  let persistTimer: number | undefined
-  watch(
-    todos,
-    (v) => {
-      clearTimeout(persistTimer)
-    persistTimer = window.setTimeout(
-      () => {
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(v))
-        } catch {
-          /* localStorage 不可用（隐私模式 / 配额满）时静默忽略 */
-        }
-      },
-      200
-    )
-    },
-    { deep: true }
-  )
-  watch(
-    categories,
-    (v) =>
-      localStorage.setItem(
-        CATEGORY_KEY,
-        JSON.stringify(v.filter((c) => !PRESET_CATEGORIES.includes(c)))
-      ),
-    { deep: true }
-  )
-
-  /** 立即同步写入 localStorage，绕过 200ms 防抖，用于页面/窗口关闭前兜底（审查 L-40） */
-  function flushNow() {
+  async function load() {
+    if (loaded.value || loadError.value) return
+    if (!isStorageAvailable()) {
+      loadError.value = le('errors.idbDisabled')
+      return
+    }
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(todos.value))
-    } catch {
-      /* ignore */
+      let list = await todoRepository.list()
+      // 首次迁移：Dexie 为空且旧 localStorage 有数据 → 迁入并写回 DAL（审查 M-4）
+      if (list.length === 0) {
+        const migrated = migrateFromLocalStorage()
+        if (migrated.todos.length) {
+          await todoRepository.saveMany(migrated.todos)
+          list = migrated.todos
+        }
+        if (migrated.categories.length) await todoCategoryRepository.save(migrated.categories)
+      }
+      todos.value = list
+      categories.value = await loadCategories()
+      loaded.value = true
+    } catch (e) {
+      loadError.value = e instanceof Error ? e.message : le('errors.idbReadFailed')
     }
   }
-  if (typeof window !== 'undefined') {
-    window.addEventListener('beforeunload', flushNow)
+
+  /** 强制重新加载（备份导入 / 外部变更后刷新内存态，避免 UI 显示旧数据） */
+  async function reload() {
+    loaded.value = false
+    loadError.value = null
+    await load()
   }
 
-  /** 重新从 localStorage 读取（审查 M-46）：备份导入后刷新内存态，避免 UI 显示旧数据 */
-  function reload() {
-    // 先清掉防抖 timer：导入后若旧 timer 触发，会用导入前的旧数据覆盖刚写入的结果（审查 H-4）
-    clearTimeout(persistTimer)
-    todos.value = loadTodos()
-    categories.value = loadCategories()
+  /** 从旧 localStorage 迁出待办及其分类（仅首次运行一次） */
+  function migrateFromLocalStorage(): { todos: TodoRecord[]; categories: string[] } {
+    try {
+      const raw = localStorage.getItem('qingjian.todos')
+      if (!raw) return { todos: [], categories: [] }
+      const list = JSON.parse(raw) as TodoRecord[]
+      if (!Array.isArray(list)) return { todos: [], categories: [] }
+      const stored = Number(localStorage.getItem('qingjian.todos-version')) || 1
+      const migrated = stored >= TODOS_VERSION ? list : migrateTodos(list, stored)
+      const catRaw = localStorage.getItem('qingjian.todo-categories')
+      const categories = catRaw ? (JSON.parse(catRaw) as string[]) : []
+      // 迁移完成即清掉旧键，避免重复卷入
+      localStorage.removeItem('qingjian.todos')
+      localStorage.removeItem('qingjian.todos-version')
+      localStorage.removeItem('qingjian.todo-categories')
+      return { todos: migrated, categories }
+    } catch (e) {
+      console.error('[todos] 从 localStorage 迁移失败', e)
+      return { todos: [], categories: [] }
+    }
+  }
+
+  async function loadCategories(): Promise<string[]> {
+    const items = await todoCategoryRepository.list()
+    return [...PRESET_CATEGORIES, ...items.filter((c) => !PRESET_CATEGORIES.includes(c))]
   }
 
   /* ---------- 完成态（每日任务按“今天”判定） ---------- */
@@ -183,7 +165,7 @@ export const useTodoStore = defineStore('todos', () => {
       })
   }
 
-  /** 分类进度缓存：todos 变化时一次性算好各分类 { done, total, rate }，避免模板每渲染都全量遍历（审查 M-8） */
+  /** 分类进度缓存：todos 变化时一次性算好各分类 { done, total, rate } */
   const progressCache = computed(() => {
     const map: Record<string, { done: number; total: number; rate: number }> = {}
     for (const cat of categories.value) {
@@ -198,7 +180,7 @@ export const useTodoStore = defineStore('todos', () => {
     return map
   })
 
-  /** 取某分类进度（来自缓存，审查 M-8） */
+  /** 取某分类进度（来自缓存） */
   function categoryProgress(cat: string) {
     return progressCache.value[cat] ?? { done: 0, total: 0, rate: 0 }
   }
@@ -207,7 +189,6 @@ export const useTodoStore = defineStore('todos', () => {
   const yesterdayMissed = computed(() => {
     const now = new Date()
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
-    // 与 startOfToday 同源的单一 now，避免两次 new Date() 跨越午夜导致判定不一致（审查 L-29）
     const yk = prevDayKey(dateKey(now))
     return todos.value.filter(
       (t) =>
@@ -217,7 +198,7 @@ export const useTodoStore = defineStore('todos', () => {
     ).length
   })
 
-  /** 每日任务连续打卡缓存表 id → 天数（审查 M-15：避免 v-for 每行重复回溯计算） */
+  /** 每日任务连续打卡缓存表 id → 天数 */
   const streaks = computed<Record<string, number>>(() => {
     const map: Record<string, number> = {}
     for (const t of todos.value) {
@@ -230,7 +211,6 @@ export const useTodoStore = defineStore('todos', () => {
   function streak(t: TodoRecord): number {
     if (t.category !== DAILY_CATEGORY) return 0
     const set = new Set(t.doneDates ?? [])
-    // 纯日历日字符串回溯，杜绝 DST 切换 / 午夜边界导致的日期错位（审查 L-28）
     let key = dateKey()
     if (!set.has(key)) key = prevDayKey(key) // 今天没做，从昨天回溯
     let n = 0
@@ -246,7 +226,6 @@ export const useTodoStore = defineStore('todos', () => {
     todos.value
       .filter((t) => !isDone(t))
       .sort((a, b) => {
-        // 每日任务优先展示
         const ca = a.category === DAILY_CATEGORY ? 0 : 1
         const cb = b.category === DAILY_CATEGORY ? 0 : 1
         return (
@@ -274,9 +253,9 @@ export const useTodoStore = defineStore('todos', () => {
       else g.upcoming.push(t)
     }
     const byDateAsc = (a: TodoRecord, b: TodoRecord) => (a.dueDate! < b.dueDate! ? -1 : 1)
-    g.overdue.sort(byDateAsc) // 最久未还（最早）在前
+    g.overdue.sort(byDateAsc)
     g.today.sort(byDateAsc)
-    g.upcoming.sort(byDateAsc) // 最近在前
+    g.upcoming.sort(byDateAsc)
     return g
   })
 
@@ -304,7 +283,7 @@ export const useTodoStore = defineStore('todos', () => {
   ) {
     const t = title.trim()
     if (!t) return
-    todos.value.unshift({
+    const todo: TodoRecord = {
       id: crypto.randomUUID(),
       title: t,
       done: false,
@@ -315,7 +294,10 @@ export const useTodoStore = defineStore('todos', () => {
       doneDates: category === DAILY_CATEGORY ? [] : undefined,
       createdAt: Date.now(),
       updatedAt: Date.now()
-    })
+    }
+    todos.value.unshift(todo)
+    // 立即落盘（DAL 已做事务/回滚保障），无需防抖：单条写入足够快
+    void todoRepository.save(toPlain(todo)).catch((e) => console.error('[todos] 保存失败', e))
   }
 
   /** 设置 / 清除任务截止日（v0.3.0 日程合并） */
@@ -323,6 +305,7 @@ export const useTodoStore = defineStore('todos', () => {
     const t = todos.value.find((x) => x.id === id)
     if (!t) return
     t.dueDate = date || undefined
+    void todoRepository.save(toPlain(t)).catch(() => {})
   }
 
   function toggle(id: string) {
@@ -336,7 +319,7 @@ export const useTodoStore = defineStore('todos', () => {
         dates.splice(i, 1)
       } else {
         dates.push(today)
-        // 裁剪：长期使用的每日任务 doneDates 会无限增长，仅保留最近 365 天（审查 H-13 / M-4）
+        // 裁剪：长期使用的每日任务 doneDates 会无限增长，仅保留最近 365 天
         const cutoff = dateKeyDaysAgo(365)
         if (dates.length > 365) t.doneDates = dates.filter((d) => d >= cutoff)
       }
@@ -344,10 +327,21 @@ export const useTodoStore = defineStore('todos', () => {
       t.done = !t.done
       t.completedAt = t.done ? Date.now() : undefined
     }
+    t.updatedAt = Date.now()
+    void todoRepository.save(toPlain(t)).catch(() => {})
   }
 
   function remove(id: string) {
-    todos.value = todos.value.filter((t) => t.id !== id)
+    const t = todos.value.find((x) => x.id === id)
+    if (!t) return
+    todos.value = todos.value.filter((x) => x.id !== id)
+    void todoRepository.delete(id).catch(() => {})
+  }
+
+  /** 仅持久化「自定义分类」部分（预设分类在读取时由 DAL 补充在前） */
+  function persistCategories() {
+    const custom = categories.value.filter((c) => !PRESET_CATEGORIES.includes(c))
+    void todoCategoryRepository.save(custom).catch(() => {})
   }
 
   /** 新增自定义分类；返回是否成功 */
@@ -355,6 +349,7 @@ export const useTodoStore = defineStore('todos', () => {
     const n = name.trim()
     if (!n || n.length > 8 || categories.value.includes(n)) return false
     categories.value.push(n)
+    persistCategories()
     return true
   }
 
@@ -365,11 +360,14 @@ export const useTodoStore = defineStore('todos', () => {
     todos.value.forEach((t) => {
       if (t.category === name) t.category = '生活'
     })
+    persistCategories()
   }
 
   return {
     todos,
     categories,
+    loaded,
+    loadError,
     pending,
     doneCount,
     usedTags,
@@ -381,8 +379,8 @@ export const useTodoStore = defineStore('todos', () => {
     completedCountOn,
     streak,
     streaks,
+    load,
     reload,
-    flushNow,
     add,
     toggle,
     remove,

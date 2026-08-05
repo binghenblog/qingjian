@@ -179,7 +179,8 @@ onMounted(() => {
               <span class="i-carbon-ai-status text-2xl text-white" />
             </span>
             <h3 class="font-semibold m-0 mb-1">{{ t('ai.title') }}</h3>
-            <p class="text-sm text-fg-faint m-0 max-w-xs leading-relaxed" v-html="t('ai.emptyHint')" />
+            <p class="text-sm text-fg-faint m-0 max-w-xs leading-relaxed">{{ t('ai.emptyHint') }}</p>
+            <p class="text-xs text-fg-faint opacity-80 m-0 mt-1 max-w-xs leading-relaxed">{{ t('ai.emptyHintSub') }}</p>
           </div>
         </div>
 

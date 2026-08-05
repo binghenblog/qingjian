@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { storage, isStorageAvailable, type NoteRecord } from '@/services/storage'
+import { noteRepository, isStorageAvailable } from '@/db'
+import type { NoteRecord } from '@/types'
 import { le } from '@/i18n/errors'
 import { useToast } from '@/composables/useToast'
 
@@ -48,7 +49,7 @@ export const useNoteStore = defineStore('notes', () => {
       return
     }
     try {
-      notes.value = await storage.listNotes()
+      notes.value = await noteRepository.list()
       // 兜底：笔记里出现但列表里没有的文件夹（如导入数据），自动补录
       const known = new Set(folders.value)
       let dirty = false
@@ -106,7 +107,7 @@ export const useNoteStore = defineStore('notes', () => {
     persistFolders()
     affected.forEach((n) => (n.folder = ''))
     try {
-      await storage.saveNotes(affected.map(toPlain))
+      await noteRepository.saveMany(affected.map(toPlain))
       lastError.value = null
     } catch (e) {
       affected.forEach((n) => (n.folder = name))
@@ -128,7 +129,7 @@ export const useNoteStore = defineStore('notes', () => {
     const now = Date.now()
     const n: NoteRecord = {
       id: crypto.randomUUID(),
-      title: '无标题笔记',
+      title: le('notes.untitled'),
       content: '',
       tags: [],
       folder,
@@ -136,7 +137,7 @@ export const useNoteStore = defineStore('notes', () => {
       updatedAt: now
     }
     try {
-      await storage.saveNote(toPlain(n))
+      await noteRepository.save(toPlain(n))
       notes.value.unshift(n)
       currentId.value = n.id
       return n
@@ -162,7 +163,7 @@ export const useNoteStore = defineStore('notes', () => {
     const snapshot = { ...n, tags: [...n.tags] }
     Object.assign(n, patch, { updatedAt: Date.now() })
     try {
-      await storage.saveNote(toPlain(n))
+      await noteRepository.save(toPlain(n))
       lastError.value = null
     } catch (e) {
       Object.assign(n, snapshot)
@@ -178,7 +179,7 @@ export const useNoteStore = defineStore('notes', () => {
     if (idx === -1) return
     try {
       // 先删磁盘，成功后再改内存；磁盘失败则保留内存态并提示，避免「已删」复活（审查 M-1）
-      await storage.deleteNote(id)
+      await noteRepository.delete(id)
       notes.value.splice(idx, 1)
       if (currentId.value === id) currentId.value = notes.value[0]?.id ?? null
       lastError.value = null
@@ -197,7 +198,7 @@ export const useNoteStore = defineStore('notes', () => {
   async function restore(note: NoteRecord) {
     notes.value = [note, ...notes.value]
     try {
-      await storage.saveNote(toPlain(note))
+      await noteRepository.save(toPlain(note))
       lastError.value = null
     } catch (e) {
       // 写盘失败：回滚，避免内存里出现「没存上的幽灵笔记」

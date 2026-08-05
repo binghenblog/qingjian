@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { transactionStorage } from '@/services/storage'
+import { transactionRepository as transactionStorage } from '@/db'
 import { dateKey, dateKeyDaysAgo } from '@/stores/todos'
 import type { Transaction, TxType } from '@/types'
 

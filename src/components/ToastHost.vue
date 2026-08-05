@@ -26,9 +26,12 @@ function runAction(item: ToastItem) {
 
 <template>
   <Teleport to="body">
-    <!-- 容器不拦截指针事件，仅 Toast 本体可点击关闭 -->
+    <!-- 容器不拦截指针事件，仅 Toast 本体可点击关闭。
+         移动端（<1024px）：顶部全宽、避让标题栏；桌面端：右上角固定宽 -->
     <div
-      class="toast-wrap fixed z-[200] top-4 right-4 flex flex-col gap-2 w-[330px] max-w-[90vw] pointer-events-none"
+      class="toast-wrap fixed z-[200] flex flex-col gap-2 pointer-events-none
+             top-2 right-2 left-2 w-auto max-w-none
+             sm:top-4 sm:right-4 sm:left-auto sm:w-[330px] sm:max-w-[90vw]"
       aria-live="polite"
     >
       <TransitionGroup name="toast">

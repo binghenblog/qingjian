@@ -8,11 +8,14 @@
   /* 主视觉横幅：与品牌同色系渐变（杜绝蓝色 / 冷暖混搭） */
   --c-hero: linear-gradient(135deg, #2bb3a6 0%, #1e8c82 100%);
 
-  /* 辅助色：成功=浅青；警告=橙黄（逾期任务）；禁用紫色 */
+  /* 辅助色：成功=浅青；警告=橙黄（逾期任务）；危险/删除=柔和砖红（与记账支出色一致，避免刺眼大红） */
   --c-success: #26a69a;
   --c-success-soft: #26a69a1f;
   --c-warning: #f59e0b;
   --c-warning-soft: #f59e0b1f;
+  /* 危险/删除：柔和砖红（与记账支出色一致，避免刺眼大红） */
+  --c-danger: #c75d4f;
+  --c-danger-soft: #c75d4f22;
 
   /* 表面层次：页面底 → 卡片面 → 悬浮面 */
   --c-bg: #f4f6f9;
@@ -22,6 +25,9 @@
   --c-fg-soft: #374151;
   --c-fg-faint: #3f4b5b;
   --c-border: #e5e7eb;
+
+  /* 弹层遮罩（统一所有 Modal / Confirm / Palette / ActionSheet 的半透明黑） */
+  --c-overlay: rgba(16, 24, 40, 0.45);
 
   /* 阴影：单层柔和浅阴影（规范：杜绝多重阴影，浅色不过重） */
   --shadow-sm: 0 1px 3px rgba(16, 24, 40, 0.06);
@@ -51,6 +57,9 @@
   --c-success-soft: #2bb3a61f;
   --c-warning: #fbbf24;
   --c-warning-soft: #f59e0b26;
+  /* 危险/删除（暗色下提亮，保持可读） */
+  --c-danger: #e0796a;
+  --c-danger-soft: #c75d4f33;
 
   --c-bg: #0b0f17;
   --c-surface: #151b25;
@@ -59,6 +68,9 @@
   --c-fg-soft: #cbd5e1;
   --c-fg-faint: #9ca3af;
   --c-border: #253046;
+
+  /* 弹层遮罩（暗色下稍深） */
+  --c-overlay: rgba(0, 0, 0, 0.55);
 
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.35);
@@ -77,6 +89,15 @@
 
 * { box-sizing: border-box; }
 html, body, #app { height: 100%; margin: 0; }
+
+/* 系统安全区变量（Tauri 移动端 / 刘海屏 / 手势条）：
+   env(safe-area-inset-*) 在支持 viewport-fit=cover 的环境下生效，桌面端恒为 0 */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
 
 body {
   font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -129,6 +150,29 @@ a { color: inherit; text-decoration: none; }
   box-shadow: 0 0 0 3px var(--c-brand-soft);
 }
 
+/* 统一文本输入控件（textarea / select / 未加 .input-modern 的原始 input）：
+   边框 + hover + 聚焦环，消除各页面输入框深浅不一致（审查 L-? UI 统一） */
+input[type="text"], input[type="number"], input[type="date"], input[type="search"],
+input[type="email"], input[type="password"], input[type="time"], input:not([type]),
+textarea, select {
+  font: inherit;
+  color: var(--c-fg);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+input::placeholder, textarea::placeholder { color: var(--c-fg-faint); }
+input:hover:not(:disabled), textarea:hover:not(:disabled), select:hover:not(:disabled) {
+  border-color: var(--c-brand-soft);
+}
+input:focus, textarea:focus, select:focus {
+  border-color: var(--c-brand);
+  box-shadow: 0 0 0 3px var(--c-brand-soft);
+}
+
 /* Hero 主视觉卡片 */
 .hero-card {
   background: var(--c-hero);
@@ -148,44 +192,63 @@ a { color: inherit; text-decoration: none; }
   pointer-events: none;
 }
 
-/* 次按钮（白底青字） */
-.btn-secondary {
-  background: rgba(255, 255, 255, 0.95);
-  color: var(--c-brand-strong);
-  border: none;
+/* ============ 按钮体系（扁平无阴影） ============ */
+/* 基础：所有按钮统一消除内联 focus 轮廓，走全局 :focus-visible；无 box-shadow 无位移 */
+.btn-primary,
+.btn-secondary,
+.btn-danger {
   border-radius: var(--radius);
   font-weight: 500;
   cursor: pointer;
-  transition: opacity 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
-  box-shadow: var(--shadow-sm);
+  outline: none;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    opacity 0.15s ease;
 }
-.btn-secondary:hover:not(:disabled) {
-  opacity: 0.95;
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
-}
-.btn-secondary:active:not(:disabled) { transform: translateY(0); }
-/* 暗色主题下保持与浅色一致的白底青字（按钮始终位于 Hero 渐变之上，审查 M-40） */
-.dark .btn-secondary { background: rgba(255, 255, 255, 0.92); color: var(--c-brand-strong); }
 
-/* 主按钮 */
+/* 主按钮：纯品牌渐变填充，hover 仅加深不透明度，active 再降一档 */
 .btn-primary {
   background: var(--c-brand-grad);
   color: #fff;
   border: none;
-  border-radius: var(--radius);
-  font-weight: 500;
-  cursor: pointer;
-  transition: opacity 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
-  box-shadow: 0 2px 8px var(--c-brand-soft);
+  box-shadow: none;
 }
-.btn-primary:hover:not(:disabled) {
-  opacity: 0.92;
-  transform: translateY(-1px);
-  box-shadow: var(--c-brand-shadow-hover);
+.btn-primary:hover:not(:disabled) { opacity: 0.88; }
+.btn-primary:active:not(:disabled) { opacity: 0.78; }
+.btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* 次要按钮：描边，hover 品牌淡底 + 品牌字色 */
+.btn-secondary {
+  background: transparent;
+  color: var(--c-brand-strong);
+  border: 1px solid var(--c-border);
+  box-shadow: none;
 }
-.btn-primary:active:not(:disabled) { transform: translateY(0); }
-.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-secondary:hover:not(:disabled) {
+  border-color: var(--c-brand);
+  color: var(--c-brand);
+  background: var(--c-brand-soft);
+}
+.btn-secondary:active:not(:disabled) { background: var(--c-brand-soft); }
+/* 暗色主题下：透明底 + 品牌字 + 描边 */
+.dark .btn-secondary { background: transparent; color: var(--c-brand); border-color: var(--c-border); }
+
+/* 危险操作（删除）：砖红描边，hover 红底 */
+.btn-danger {
+  background: transparent;
+  color: var(--c-danger);
+  border: 1px solid var(--c-danger-soft);
+  box-shadow: none;
+}
+.btn-danger:hover:not(:disabled) {
+  background: var(--c-danger-soft);
+  border-color: var(--c-danger);
+}
+.btn-danger:active:not(:disabled) { background: var(--c-danger-soft); }
+.btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
+.dark .btn-danger { background: transparent; }
 
 /* 页面切换过渡 */
 .page-enter-active, .page-leave-active { transition: opacity 0.18s ease, transform 0.18s ease; }
@@ -261,7 +324,12 @@ textarea:focus-visible,
   border: 2px solid var(--c-border);
   background: transparent;
   border-radius: 6px;
-  transition: border-color 0.15s ease, background-color 0.15s ease;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
 }
 .check:hover { border-color: var(--c-brand); background: var(--c-brand-soft); }
+.check:focus-visible {
+  border-color: var(--c-brand);
+  box-shadow: 0 0 0 3px var(--c-brand-soft);
+  outline: none;
+}
 .check-done { border-color: var(--c-brand); background: var(--c-brand-grad); }

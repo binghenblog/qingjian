@@ -4,13 +4,17 @@ import { useI18n } from 'vue-i18n'
 import { useAnniversariesStore } from '@/stores/anniversaries'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
-import FloatingActionButton from '@/components/FloatingActionButton.vue'
+import { useFab } from '@/composables/useFab'
+import BaseModal from '@/components/BaseModal.vue'
+import EmptyState from '@/components/EmptyState.vue'
 import { dateKey } from '@/stores/todos'
 
 const { t } = useI18n()
 const store = useAnniversariesStore()
 const toast = useToast()
 const { confirm } = useConfirm()
+// 注册全局悬浮新建按钮：本页「新建纪念日」= 打开表单
+const { setFab, clearFab } = useFab()
 
 const showForm = ref(false)
 const nameInput = ref<HTMLInputElement>()
@@ -20,6 +24,7 @@ const draftDate = ref(dateKey())
 
 onMounted(() => {
   if (!store.loaded) store.load()
+  setFab(() => { showForm.value = true }, t('anniversary.add'))
 })
 
 // 表单打开时聚焦名称输入（审查 L-10）
@@ -41,7 +46,10 @@ watch(showForm, (v) => {
   if (v) window.addEventListener('keydown', onKeydown)
   else window.removeEventListener('keydown', onKeydown)
 })
-onUnmounted(() => window.removeEventListener('keydown', onKeydown))
+onUnmounted(() => {
+  window.removeEventListener('keydown', onKeydown)
+  clearFab()
+})
 
 function mdLabel(dateStr: string): string {
   const [, m, d] = dateStr.split('-')
@@ -86,15 +94,20 @@ async function removeItem(id: string, name: string) {
 
 <template>
   <div class="space-y-5 max-w-2xl">
-    <div class="flex items-baseline justify-between">
+    <div class="flex items-baseline justify-between gap-3">
       <h2 class="text-xl font-bold m-0">{{ t('anniversary.title') }}</h2>
-      <span class="text-sm text-fg-faint">{{ store.list.length }} {{ t('anniversary.count') }}</span>
+      <div class="flex items-center gap-3 shrink-0">
+        <span class="text-sm text-fg-faint">{{ store.list.length }} {{ t('anniversary.count') }}</span>
+        <!-- PC 端右上角文字新增按钮（要求一.1）；移动端由 FAB 唤起同一弹窗 -->
+        <button class="btn-primary hidden lg:inline-flex items-center gap-1 px-3 py-1.5 text-sm rounded-btn" @click="showForm = true">
+          <span class="i-carbon-add text-base" />{{ t('anniversary.add') }}
+        </button>
+      </div>
     </div>
 
-    <!-- 添加表单（FAB 唤起） -->
-    <section v-if="showForm" class="rounded-2xl p-5 space-y-4 bg-bg border border-brand/20">
-      <div class="font-semibold text-sm">{{ t('anniversary.add') }}</div>
-      <div class="space-y-3">
+    <!-- 添加表单：移入全局弹窗（要求三），PC 右上角按钮 / 移动端 FAB 均唤起本弹窗 -->
+    <BaseModal v-model="showForm" :title="t('anniversary.add')" @save="submit">
+      <div class="space-y-4">
         <label class="block">
           <span class="text-xs text-fg-soft">{{ t('anniversary.name') }}</span>
           <input
@@ -120,22 +133,14 @@ async function removeItem(id: string, name: string) {
           <input v-model="draftDate" type="date" class="input mt-1 w-full" />
         </label>
       </div>
-      <div class="flex items-center gap-2 justify-end">
-        <button class="btn-ghost px-4 py-2 text-sm" @click="showForm = false">
-          {{ t('anniversary.cancel') }}
-        </button>
-        <button class="btn-primary px-4 py-2 text-sm" @click="submit">
-          {{ t('anniversary.save') }}
-        </button>
-      </div>
-    </section>
+    </BaseModal>
 
     <!-- 纪念日列表 -->
     <div v-if="store.list.length" class="space-y-3">
       <div
         v-for="a in store.list"
         :key="a.id"
-        class="anniversary-card rounded-2xl p-4 flex items-center gap-4"
+        class="anniversary-card group rounded-2xl p-4 flex items-center gap-4"
       >
         <div class="date-chip w-14 h-14 rounded-xl grid place-items-center text-center shrink-0">
           <div class="leading-none">
@@ -155,7 +160,7 @@ async function removeItem(id: string, name: string) {
             {{ countdownLabel(a.date) }}
           </div>
           <button
-            class="text-[11px] text-fg-faint hover:text-red-500 mt-1 bg-transparent border-none cursor-pointer"
+            class="text-[11px] text-fg-faint hover:text-red-500 mt-1 bg-transparent border-none cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
             @click="removeItem(a.id, a.name)"
           >
             {{ t('common.delete') }}
@@ -163,9 +168,7 @@ async function removeItem(id: string, name: string) {
         </div>
       </div>
     </div>
-    <p v-else class="text-sm text-fg-faint m-0">{{ t('anniversary.empty') }}</p>
-
-    <FloatingActionButton :aria-label="t('anniversary.add')" @click="showForm = true" />
+    <EmptyState v-else icon="i-carbon-calendar" :title="t('anniversary.empty')" />
   </div>
 </template>
 

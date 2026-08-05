@@ -28,9 +28,9 @@ const priorityMeta: Record<TodoPriority, { label: string; cls: string }> = {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  font-size: 11px;
+  font-size: 10px;
   line-height: 1;
-  padding: 3px 7px;
+  padding: 2px 6px;
   border-radius: 999px;
   font-weight: 600;
 }

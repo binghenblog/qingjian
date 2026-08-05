@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
-import { workoutStorage, weightStorage } from '@/services/storage'
+import { workoutRepository as workoutStorage, weightRepository as weightStorage } from '@/db'
 import { dateKey } from '@/stores/todos'
 import type { WorkoutRecord, WeightRecord } from '@/types'
 

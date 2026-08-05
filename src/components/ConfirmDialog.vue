@@ -73,13 +73,16 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
 </template>
 
 <style scoped>
+.confirm-mask {
+  background: var(--c-overlay);
+}
 .confirm-box {
   background: var(--c-surface);
   border: 1px solid var(--c-border);
   box-shadow: var(--shadow-lg);
 }
 .confirm-cancel {
-  background: var(--c-bg);
+  background: var(--c-surface);
   border: 1px solid var(--c-border);
   color: var(--c-fg-soft);
   transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
@@ -92,17 +95,20 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
   background: var(--c-brand-grad);
   border: 1px solid transparent;
   color: #fff;
-  transition: opacity 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: none;
+  transition: opacity 0.15s ease;
 }
 .confirm-ok:hover {
   opacity: 0.9;
-  box-shadow: 0 3px 10px var(--c-brand-soft);
+}
+.confirm-ok:active {
+  opacity: 0.8;
 }
 .confirm-ok.confirm-danger {
   background: #dc2626;
 }
 .confirm-ok.confirm-danger:hover {
-  box-shadow: 0 3px 10px rgba(220, 38, 38, 0.3);
+  opacity: 0.9;
 }
 .fade-enter-active,
 .fade-leave-active {

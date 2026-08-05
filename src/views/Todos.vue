@@ -1,15 +1,22 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useTodoStore, PRESET_CATEGORIES, dateKey } from '@/stores/todos'
 import { useConfirm } from '@/composables/useConfirm'
+import { useFab } from '@/composables/useFab'
 import TodoBadges from '@/components/TodoBadges.vue'
+import BaseModal from '@/components/BaseModal.vue'
+import EmptyState from '@/components/EmptyState.vue'
 import type { TodoPriority, TodoRecord } from '@/types'
 import { DAILY_CATEGORY } from '@/types'
 
 const store = useTodoStore()
 const { t } = useI18n()
 const { confirm } = useConfirm()
+// 全局悬浮新建按钮（移动端 FAB）/ 弹窗可见态（要求一）
+const { setFab, clearFab } = useFab()
+const showModal = ref(false)
+const draftInput = ref<HTMLInputElement>()
 
 /** 当前分类：默认「每日」 */
 const activeCat = ref(DAILY_CATEGORY)
@@ -51,6 +58,7 @@ function add() {
   draft.value = ''
   draftTag.value = ''
   draftDue.value = ''
+  showModal.value = false
 }
 
 /** 截止日短标签 MM-DD（空值兜底，避免非空断言在异常数据下崩溃，审查 L-3） */
@@ -93,15 +101,27 @@ async function delCategory(cat: string) {
 function isPreset(cat: string) {
   return PRESET_CATEGORIES.includes(cat)
 }
+
+// 移动端 FAB 唤起与 PC 一致的弹窗（要求一.2）
+onMounted(() => {
+  setFab(() => (showModal.value = true), t('todos.addSchedule'))
+})
+onUnmounted(() => clearFab())
 </script>
 
 <template>
   <div class="space-y-5 max-w-2xl">
-      <div class="flex items-baseline justify-between">
+      <div class="flex items-baseline justify-between gap-3">
       <h2 class="text-xl font-bold m-0">{{ t('todos.title') }}</h2>
-      <span v-if="progress.total" class="text-sm text-fg-faint" aria-live="polite">
-        {{ t('todos.doneOf', { done: progress.done, total: progress.total }) }}
-      </span>
+      <div class="flex items-center gap-3 shrink-0">
+        <span v-if="progress.total" class="text-sm text-fg-faint" aria-live="polite">
+          {{ t('todos.doneOf', { done: progress.done, total: progress.total }) }}
+        </span>
+        <!-- PC 端右上角文字新增按钮（要求一.1）；移动端由 FAB 唤起同一弹窗 -->
+        <button class="btn-primary hidden lg:inline-flex items-center gap-1 px-3 py-1.5 text-sm rounded-btn" @click="showModal = true">
+          <span class="i-carbon-add text-base" />{{ t('todos.addSchedule') }}
+        </button>
+      </div>
     </div>
 
     <!-- 日程安排（与待办合并，v0.3.0） -->
@@ -185,7 +205,7 @@ function isPreset(cat: string) {
       <button
         v-else
         @click="addingCat = true"
-        class="cat-tab cat-add flex items-center gap-1 px-3 py-2 rounded-xl text-sm cursor-pointer"
+        class="cat-tab cat-add flex items-center gap-1 px-3.5 py-2 rounded-xl text-sm cursor-pointer"
       >
         <span class="i-carbon-add text-base" />
         {{ t('todos.custom') }}
@@ -212,7 +232,7 @@ function isPreset(cat: string) {
           <span class="text-fg-soft font-medium">{{ t('todos.todayProgress') }}</span>
           <span class="text-fg-faint">{{ progress.done }}/{{ progress.total }} · {{ progress.rate }}%</span>
         </div>
-        <div class="track h-2 rounded-full overflow-hidden">
+        <div class="track h-2.5 rounded-full overflow-hidden">
           <div
             class="fill h-full rounded-full transition-width duration-500"
             :class="progress.rate === 100 ? 'fill-complete' : ''"
@@ -228,7 +248,7 @@ function isPreset(cat: string) {
         <span class="text-fg-soft font-medium">{{ t('todos.catProgress', { cat: activeCat }) }}</span>
         <span class="text-fg-faint">{{ progress.done }}/{{ progress.total }} · {{ progress.rate }}%</span>
       </div>
-      <div class="track h-2 rounded-full overflow-hidden">
+      <div class="track h-2.5 rounded-full overflow-hidden">
         <div
           class="fill h-full rounded-full transition-width duration-500"
           :class="progress.rate === 100 ? 'fill-complete' : ''"
@@ -237,60 +257,60 @@ function isPreset(cat: string) {
       </div>
     </div>
 
-    <!-- 输入区 -->
-    <div class="composer rounded-2xl p-3 space-y-3">
-      <div class="flex gap-2.5">
+    <!-- 新建表单：移入全局弹窗（要求三）；PC 右上角按钮 / 移动端 FAB 唤起 -->
+    <BaseModal v-model="showModal" :title="t('todos.addSchedule')" @save="add">
+      <div class="space-y-4">
         <input
+          ref="draftInput"
           v-model="draft"
           @keyup.enter="add"
           :placeholder="isDaily ? t('todos.addDailyPlaceholder') : t('todos.addCatPlaceholder', { cat: activeCat })"
-          class="input-modern flex-1 px-4 py-2.5 text-sm"
+          class="input-modern w-full px-4 py-2.5 text-sm"
         />
-        <button @click="add" class="btn-primary px-5 py-2.5 text-sm flex items-center gap-1.5">
-          <span class="i-carbon-add text-base" />
-          {{ t('todos.add') }}
-        </button>
-      </div>
-      <div class="flex items-center gap-4 flex-wrap">
+        <div class="flex items-center gap-4 flex-wrap">
           <div class="flex items-center gap-1.5" role="radiogroup" :aria-label="t('todos.priorityAria')">
-          <span class="text-xs text-fg-faint">{{ t('todos.priorityLabel') }}</span>
-          <button
-            v-for="p in priorities"
-            :key="p.value"
-            @click="draftPriority = p.value"
-            role="radio"
-            :aria-checked="draftPriority === p.value ? 'true' : 'false'"
-            class="pri-btn flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs cursor-pointer"
-            :class="draftPriority === p.value ? 'pri-active' : ''"
-          >
-            <span class="w-1.5 h-1.5 rounded-full inline-block" :class="p.dot" />
-            {{ t(p.label) }}
-          </button>
+            <span class="text-xs text-fg-faint">{{ t('todos.priorityLabel') }}</span>
+            <button
+              v-for="p in priorities"
+              :key="p.value"
+              @click="draftPriority = p.value"
+              role="radio"
+              :aria-checked="draftPriority === p.value ? 'true' : 'false'"
+              class="pri-btn flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs cursor-pointer"
+              :class="draftPriority === p.value ? 'pri-active' : ''"
+            >
+              <span class="w-1.5 h-1.5 rounded-full inline-block" :class="p.dot" />
+              {{ t(p.label) }}
+            </button>
+          </div>
+          <div class="flex items-center gap-1.5 flex-1 min-w-40">
+            <span class="i-carbon-tag text-fg-faint text-sm shrink-0" />
+            <input
+              v-model="draftTag"
+              @keyup.enter="add"
+              list="used-tags"
+              :placeholder="t('todos.tagPlaceholder')"
+              class="flex-1 text-xs bg-transparent border-none outline-none text-fg placeholder:text-fg-faint py-1"
+            />
+            <datalist id="used-tags">
+              <option v-for="t in store.usedTags" :key="t" :value="t" />
+            </datalist>
+          </div>
+          <label class="flex items-center gap-1.5 shrink-0">
+            <span class="i-carbon-event text-fg-faint text-sm shrink-0" />
+            <input
+              v-model="draftDue"
+              type="date"
+              :placeholder="t('schedule.dueDate')"
+              class="text-xs bg-transparent border border-border rounded-lg px-2 py-1 outline-none text-fg"
+            />
+          </label>
         </div>
-        <div class="flex items-center gap-1.5 flex-1 min-w-40">
-          <span class="i-carbon-tag text-fg-faint text-sm shrink-0" />
-          <input
-            v-model="draftTag"
-            @keyup.enter="add"
-            list="used-tags"
-            :placeholder="t('todos.tagPlaceholder')"
-            class="flex-1 text-xs bg-transparent border-none outline-none text-fg placeholder:text-fg-faint py-1"
-          />
-          <datalist id="used-tags">
-            <option v-for="t in store.usedTags" :key="t" :value="t" />
-          </datalist>
-        </div>
-        <label class="flex items-center gap-1.5 shrink-0">
-          <span class="i-carbon-event text-fg-faint text-sm shrink-0" />
-          <input
-            v-model="draftDue"
-            type="date"
-            :placeholder="t('schedule.dueDate')"
-            class="text-xs bg-transparent border border-border rounded-lg px-2 py-1 outline-none text-fg"
-          />
-        </label>
       </div>
-    </div>
+    </BaseModal>
+
+    <!-- 回车新建提示 -->
+    <p class="text-[11px] text-fg-faint px-1 -mt-1">{{ t('todos.enterHint') }}</p>
 
     <!-- 列表 -->
     <TransitionGroup name="list" tag="ul" class="space-y-2 p-0 m-0 list-none">
@@ -314,7 +334,7 @@ function isPreset(cat: string) {
         </span>
         <!-- 每日任务连续打卡 -->
         <span v-if="isDaily && (store.streaks[todo.id] ?? 0) > 1" class="streak flex items-center gap-0.5 text-[11px] shrink-0">
-          <span class="i-carbon-fire text-xs" />
+          <span class="i-carbon-fire text-[11px]" />
           {{ t('todos.streakDays', { n: store.streaks[todo.id] }) }}
         </span>
         <TodoBadges :priority="todo.priority" :tag="todo.tag" />
@@ -323,7 +343,7 @@ function isPreset(cat: string) {
           class="text-[11px] px-1.5 py-0.5 rounded-full shrink-0 flex items-center gap-0.5"
           :class="isOverdue(todo) ? 'due-overdue' : 'due-normal'"
         >
-          <span class="i-carbon-event text-[10px]" />
+          <span class="i-carbon-event text-[11px]" />
           {{ dueLabel(todo.dueDate) }}
         </span>
         <button
@@ -337,16 +357,13 @@ function isPreset(cat: string) {
     </TransitionGroup>
 
     <!-- 空状态 -->
-    <div v-if="list.length === 0" class="empty grid place-items-center py-14 rounded-2xl text-center">
-      <div>
-        <span :class="catIcon(activeCat)" class="text-4xl text-fg-faint" />
-        <p class="text-sm text-fg-faint mt-2 mb-0">
-          {{ isDaily ? t('todos.emptyDaily') : t('todos.emptyCat', { cat: activeCat }) }}
-        </p>
-      </div>
-    </div>
+    <EmptyState
+      v-if="list.length === 0"
+      :icon="catIcon(activeCat)"
+      :title="isDaily ? t('todos.emptyDaily') : t('todos.emptyCat', { cat: activeCat })"
+    />
 
-    <p v-if="isDaily" class="text-xs text-fg-faint">
+    <p v-if="isDaily" class="text-[11px] text-fg-faint">
       <span class="i-carbon-information align-text-bottom" />
       {{ t('todos.dailyHint') }}
     </p>
@@ -371,7 +388,7 @@ export default {
   border: 1px solid var(--c-border);
   color: var(--c-fg-soft);
   font-weight: 500;
-  transition: border-color 0.15s ease, color 0.15s ease;
+  transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
 }
 .cat-tab:hover {
   border-color: var(--c-brand);
@@ -382,6 +399,7 @@ export default {
   background: var(--c-brand-soft);
   color: var(--c-brand-strong);
   font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--c-brand);
 }
 .dark .cat-active { color: var(--c-brand); }
 .cat-count {
@@ -412,14 +430,14 @@ export default {
 .dark .missed-num { color: #fbbf24; }
 
 .clear-banner {
-  background: #10b98112;
-  border: 1px solid #10b98140;
-  color: #047857;
+  background: rgba(16, 185, 129, 0.05);
+  border: 1px solid rgba(16, 185, 129, 0.20);
+  color: #4a9e7c;
 }
 .dark .clear-banner {
-  background: #10b9811f;
-  border-color: #10b98138;
-  color: #34d399;
+  background: rgba(16, 185, 129, 0.10);
+  border-color: rgba(16, 185, 129, 0.26);
+  color: #6bd1a8;
 }
 
 /* 进度条 */
@@ -447,12 +465,16 @@ export default {
 }
 
 .pri-btn {
-  background: var(--c-bg);
+  background: var(--c-surface);
   border: 1px solid var(--c-border);
   color: var(--c-fg-soft);
+  cursor: pointer;
   transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
 }
-.pri-btn:hover { color: var(--c-fg); }
+.pri-btn:hover {
+  color: var(--c-fg);
+  border-color: var(--c-brand);
+}
 .pri-active {
   border-color: var(--c-brand);
   background: var(--c-brand-soft);
@@ -474,8 +496,6 @@ export default {
 /* .check / .check-done 已抽取到全局 theme.css（审查 M-23） */
 
 .del { transition: opacity 0.15s ease, color 0.15s ease; }
-
-.empty { border: 1.5px dashed var(--c-border); }
 
 /* 日程区（v0.3.0） */
 .agenda-card {

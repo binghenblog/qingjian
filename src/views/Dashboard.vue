@@ -4,14 +4,43 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useTodoStore, dateKey } from '@/stores/todos'
 import { useSettingsStore } from '@/stores/settings'
+import { useFab } from '@/composables/useFab'
 import TodoBadges from '@/components/TodoBadges.vue'
 import KbdTip from '@/components/KbdTip.vue'
+import BaseModal from '@/components/BaseModal.vue'
+import type { TodoPriority } from '@/types'
 import { DAILY_CATEGORY } from '@/types'
 
 const router = useRouter()
 const store = useTodoStore()
 const settings = useSettingsStore()
 const { t } = useI18n()
+
+/** 新建任务：PC 右上角文字按钮 / 移动端 FAB → 同一个全局弹窗（要求一、三） */
+const { setFab, clearFab } = useFab()
+const showTaskModal = ref(false)
+const draft = ref('')
+const draftPriority = ref<TodoPriority>('medium')
+const draftTag = ref('')
+const draftDue = ref('')
+const priorities: { value: TodoPriority; label: string; dot: string }[] = [
+  { value: 'high', label: 'todos.priorityHigh', dot: 'bg-red-500' },
+  { value: 'medium', label: 'todos.priorityMedium', dot: 'bg-amber-500' },
+  { value: 'low', label: 'todos.priorityLow', dot: 'bg-slate-400' }
+]
+
+/** 复用待办 store 的新增逻辑，数据链路不变（要求四） */
+function createTask() {
+  if (!draft.value.trim()) return
+  store.add(draft.value, draftPriority.value, draftTag.value, DAILY_CATEGORY, draftDue.value || undefined)
+  draft.value = ''
+  draftTag.value = ''
+  draftDue.value = ''
+  showTaskModal.value = false
+}
+
+onMounted(() => setFab(() => (showTaskModal.value = true), t('dashboard.newTask')))
+onUnmounted(() => clearFab())
 /** 显示名：设置里可自定义，默认「朋友」 */
 const displayName = computed(() => settings.userName.trim() || '朋友')
 
@@ -106,10 +135,6 @@ const quickCards = computed(() => {
   return base
 })
 
-function addTodo() {
-  router.push('/todos')
-}
-
 function addProgress() {
   // 未来可打开"记一笔进展"弹窗；现在跳到待办页
   router.push('/todos')
@@ -136,14 +161,15 @@ function dismissHero() {
           {{ t(greeting) }}，<span class="grad-text">{{ displayName }}</span>
         </h1>
       </div>
-      <div class="flex items-center gap-2.5">
+      <!-- PC 端右上角操作区（要求一.1）；移动端隐藏，改由右下角 FAB 唤起同一弹窗 -->
+      <div class="hidden lg:flex items-center gap-2.5">
         <KbdTip :keys="'Ctrl N'" :label="t('kbd.newTask')">
-          <button @click="addTodo" class="action-btn flex items-center gap-1.5 px-4 py-2 text-sm rounded-btn">
+          <button @click="showTaskModal = true" class="btn-primary flex items-center gap-1.5 px-4 py-2 text-sm rounded-btn">
             <span class="i-carbon-add text-base" />
-            {{ t('dashboard.newWork') }}
+            {{ t('dashboard.newTask') }}
           </button>
         </KbdTip>
-        <button @click="addProgress" class="btn-primary flex items-center gap-1.5 px-4 py-2 text-sm rounded-btn">
+        <button @click="addProgress" class="action-btn flex items-center gap-1.5 px-4 py-2 text-sm rounded-btn">
           <span class="i-carbon-edit text-base" />
           {{ t('dashboard.logProgress') }}
         </button>
@@ -156,9 +182,9 @@ function dismissHero() {
         @click="dismissHero"
         :aria-label="t('dashboard.heroDismiss')"
         :title="t('dashboard.heroDismiss')"
-        class="absolute top-3 right-3 z-20 grid place-items-center w-8 h-8 rounded-lg text-white/80 hover:text-white hover:bg-white/15 cursor-pointer transition-colors"
+        class="hero-close absolute top-3 right-3 z-20 grid place-items-center w-7 h-7 rounded-full text-white/50 hover:text-white cursor-pointer"
       >
-        <span class="i-carbon-close text-base" />
+        <span class="i-carbon-close text-sm" />
       </button>
       <div class="relative z-10 max-w-lg">
         <div class="text-[11px] font-medium text-white/70 mb-2">{{ t('dashboard.heroHint') }}</div>
@@ -170,7 +196,7 @@ function dismissHero() {
         </p>
       </div>
       <div class="relative z-10 mt-5">
-        <button @click="addProgress" class="btn-secondary flex items-center gap-1.5 px-4 py-2 text-sm rounded-btn">
+        <button @click="addProgress" class="hero-cta flex items-center gap-1.5 px-5 py-2.5 text-sm rounded-btn">
           <span class="i-carbon-edit text-base" />
           {{ t('dashboard.heroCta') }}
         </button>
@@ -193,16 +219,8 @@ function dismissHero() {
               {{ t('dashboard.yesterdayMissed', { n: store.yesterdayMissed }) }}
             </span>
           </div>
+          <!-- 新建入口统一收敛到页面右上角（PC）/ 右下角 FAB（移动端），此处只保留跳转链接（要求一.1） -->
           <div class="flex items-center gap-2.5">
-            <KbdTip :keys="'Ctrl N'" :label="t('kbd.newTask')">
-              <button
-                @click="router.push('/todos')"
-                class="btn-primary flex items-center gap-1.5 px-4 py-2 text-sm rounded-btn"
-              >
-                <span class="i-carbon-add text-base" />
-                {{ t('dashboard.newTask') }}
-              </button>
-            </KbdTip>
             <button
               @click="router.push('/todos')"
               class="text-xs text-fg-soft hover:text-brand cursor-pointer bg-transparent border-none flex items-center gap-1"
@@ -231,7 +249,7 @@ function dismissHero() {
             </button>
             <span class="flex-1 text-sm truncate">{{ todo.title }}</span>
             <span
-              class="cat-chip text-[11px] px-2 py-0.5 rounded-full shrink-0"
+              class="cat-chip text-[10px] px-1.5 py-0.5 rounded-full shrink-0"
               :class="todo.category === DAILY_CATEGORY ? 'cat-daily' : ''"
             >
               {{ todo.category }}
@@ -265,8 +283,9 @@ function dismissHero() {
             </template>
             <template v-else>
               <p class="text-sm text-fg-faint mt-2 mb-0">{{ t('dashboard.emptyNone') }}</p>
+              <!-- 空状态文案保留不动，仅把入口改为唤起同一弹窗（要求四） -->
               <button
-                @click="router.push('/todos')"
+                @click="showTaskModal = true"
                 class="btn-primary flex items-center gap-1.5 px-4 py-2 text-sm mt-4 rounded-btn"
               >
                 <span class="i-carbon-add text-base" />
@@ -305,7 +324,7 @@ function dismissHero() {
                 <span v-if="store.isDone(todo)" class="i-carbon-checkmark text-[13px] leading-none text-white" />
               </button>
               <span class="flex-1 text-sm truncate">{{ todo.title }}</span>
-              <span class="cat-chip text-[11px] px-2 py-0.5 rounded-full shrink-0">{{ todo.category }}</span>
+              <span class="cat-chip text-[10px] px-1.5 py-0.5 rounded-full shrink-0">{{ todo.category }}</span>
             </li>
           </TransitionGroup>
           <div v-else class="empty grid place-items-center py-8 rounded-btn text-center">
@@ -384,6 +403,55 @@ function dismissHero() {
       </button>
     </div>
 
+    <!-- 新建任务弹窗（要求三）：PC 右上角按钮 / 移动端 FAB 共用 -->
+    <BaseModal v-model="showTaskModal" :title="t('dashboard.newTask')" @save="createTask">
+      <div class="space-y-4">
+        <input
+          v-model="draft"
+          @keyup.enter="createTask"
+          :placeholder="t('todos.addDailyPlaceholder')"
+          class="input-modern w-full px-4 py-2.5 text-sm"
+        />
+        <div class="flex items-center gap-4 flex-wrap">
+          <div class="flex items-center gap-1.5" role="radiogroup" :aria-label="t('todos.priorityAria')">
+            <span class="text-xs text-fg-faint">{{ t('todos.priorityLabel') }}</span>
+            <button
+              v-for="p in priorities"
+              :key="p.value"
+              @click="draftPriority = p.value"
+              role="radio"
+              :aria-checked="draftPriority === p.value ? 'true' : 'false'"
+              class="pri-btn flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs cursor-pointer"
+              :class="draftPriority === p.value ? 'pri-active' : ''"
+            >
+              <span class="w-1.5 h-1.5 rounded-full inline-block" :class="p.dot" />
+              {{ t(p.label) }}
+            </button>
+          </div>
+          <div class="flex items-center gap-1.5 flex-1 min-w-40">
+            <span class="i-carbon-tag text-fg-faint text-sm shrink-0" />
+            <input
+              v-model="draftTag"
+              @keyup.enter="createTask"
+              list="dash-used-tags"
+              :placeholder="t('todos.tagPlaceholder')"
+              class="flex-1 text-xs bg-transparent border-none outline-none text-fg placeholder:text-fg-faint py-1"
+            />
+            <datalist id="dash-used-tags">
+              <option v-for="tag in store.usedTags" :key="tag" :value="tag" />
+            </datalist>
+          </div>
+          <label class="flex items-center gap-1.5 shrink-0">
+            <span class="i-carbon-event text-fg-faint text-sm shrink-0" />
+            <input
+              v-model="draftDue"
+              type="date"
+              class="text-xs bg-transparent border border-border rounded-lg px-2 py-1 outline-none text-fg"
+            />
+          </label>
+        </div>
+      </div>
+    </BaseModal>
   </div>
 </template>
 
@@ -393,6 +461,39 @@ function dismissHero() {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+
+/* 横幅关闭按钮：扁平无阴影，hover 淡白圆底 + 加深图标（与全局扁平按钮风格一致） */
+.hero-close {
+  background: transparent;
+  border: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.hero-close:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+.hero-close:active {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+/* 横幅主 CTA：白色实底 + 深青文字，深色横幅上醒目（原 .btn-secondary 描边字太淡） */
+.hero-cta {
+  background: #fff;
+  color: var(--c-brand-strong);
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.hero-cta:hover {
+  opacity: 0.92;
+  transform: translateY(-1px);
+}
+.hero-cta:active {
+  opacity: 0.85;
+  transform: translateY(0);
 }
 
 /* 顶栏实时时钟：弱化透明度，不与问候语抢视觉 */
@@ -413,6 +514,9 @@ function dismissHero() {
 }
 .action-btn:hover {
   border-color: var(--c-brand);
+  background: var(--c-surface-hover);
+}
+.action-btn:active {
   background: var(--c-surface-hover);
 }
 
@@ -472,6 +576,22 @@ function dismissHero() {
   background: var(--c-bg);
   border: 1px solid var(--c-border);
 }
+
+/* 新建任务弹窗内的优先级选择（与待办页同款扁平样式，全部走主题变量） */
+.pri-btn {
+  background: var(--c-bg);
+  border: 1px solid var(--c-border);
+  color: var(--c-fg-soft);
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+.pri-btn:hover { color: var(--c-fg); }
+.pri-active {
+  border-color: var(--c-brand);
+  background: var(--c-brand-soft);
+  color: var(--c-brand-strong);
+  font-weight: 600;
+}
+.dark .pri-active { color: var(--c-brand); }
 
 .bar-track { background: var(--c-bg); }
 .bar-fill { background: var(--c-brand-grad); }

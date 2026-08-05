@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import { useNoteStore } from '@/stores/notes'
 import { useTodoStore } from '@/stores/todos'
 import { useAiStore } from '@/stores/ai'
+import { useSettingsStore } from '@/stores/settings'
 import { useToast } from '@/composables/useToast'
 import { buildContext } from '@/services/aiContext'
 
@@ -15,6 +16,7 @@ const router = useRouter()
 const noteStore = useNoteStore()
 const todoStore = useTodoStore()
 const ai = useAiStore()
+const settings = useSettingsStore()
 const toast = useToast()
 const { t } = useI18n()
 const q = ref('')
@@ -147,7 +149,9 @@ function go(item: PaletteItem) {
 }
 
 function onKeydown(e: KeyboardEvent) {
+  // Ctrl/Cmd+K 呼出命令面板：受设置「快捷键」开关控制（默认关闭）
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+    if (!settings.shortcutsEnabled) return
     e.preventDefault()
     emit('update:open', !props.open)
     return
@@ -237,7 +241,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 
 <style scoped>
 .palette-mask {
-  background: rgba(10, 14, 20, 0.4);
+  background: var(--c-overlay);
   backdrop-filter: blur(4px);
 }
 .palette {

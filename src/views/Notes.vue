@@ -14,15 +14,14 @@ if (import.meta.hot) {
 </script>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useNoteStore } from '@/stores/notes'
 import { useAiStore } from '@/stores/ai'
-import { useQuotesStore, QUOTE_CATEGORIES } from '@/stores/quotes'
-import { dateKey } from '@/stores/todos'
 import { useConfirm } from '@/composables/useConfirm'
 import { useToast } from '@/composables/useToast'
+import { useFab } from '@/composables/useFab'
 import { md } from '@/services/markdown'
 import { buildContext } from '@/services/aiContext'
 
@@ -32,45 +31,12 @@ const router = useRouter()
 const { t } = useI18n()
 const { confirm } = useConfirm()
 const { info: toastInfo } = useToast()
-const toast = useToast()
+// 移动端 FAB（要求一.2）：与 PC 右上角按钮共用同一新建动作
+const { setFab, clearFab } = useFab()
 
-// 模块切换：笔记 / 好句（记好句已并入笔记，2026-08-04）
-const activeTab = ref<'notes' | 'quotes'>('notes')
-
-// 好句（quotes）子模块：复用 quotes store，UI 内联以保持与笔记一致的青色风格
-const quotes = useQuotesStore()
-const showQuoteForm = ref(false)
-const qText = ref('')
-const qCategory = ref('')
-const qDate = ref(dateKey())
-const qInput = ref<HTMLTextAreaElement | null>(null)
-watch(showQuoteForm, (v) => {
-  if (v) nextTick(() => qInput.value?.focus())
-})
-onMounted(() => {
-  if (!quotes.loaded) quotes.load()
-})
-async function addQuote() {
-  const text = qText.value.trim()
-  if (!text) {
-    toast.error(t('quote.textRequired'))
-    return
-  }
-  await quotes.add({ text, category: qCategory.value.trim() || undefined, date: qDate.value })
-  qText.value = ''
-  qCategory.value = ''
-  qDate.value = dateKey()
-  showQuoteForm.value = false
-  toast.success(t('quote.added'))
-}
-async function delQuote(id: string) {
-  const ok = await confirm({
-    title: t('quote.confirmDeleteTitle'),
-    message: t('quote.confirmDelete'),
-    confirmText: t('common.delete'),
-    danger: true
-  })
-  if (ok) await quotes.remove(id)
+/** 新建笔记（PC 右上角 / 移动端 FAB） */
+function primaryCreate() {
+  void newNote()
 }
 
 const mode = ref<'edit' | 'preview' | 'split'>('edit')
@@ -227,6 +193,7 @@ onUnmounted(() => {
   clearTimeout(searchTimer)
   window.removeEventListener('beforeunload', beforeUnloadFlush)
   unlistenClose?.()
+  clearFab()
 })
 
 function fmt(ts: number) {
@@ -301,6 +268,8 @@ function removeTag(t: string) {
 
 onMounted(() => {
   if (!store.loaded) store.load()
+  // 移动端 FAB 唤起与 PC 一致的新建动作（要求一.2）
+  setFab(primaryCreate, t('notes.newNote'))
   window.addEventListener('beforeunload', beforeUnloadFlush)
   // 桌面端：窗口关闭事件由 Tauri 派发，WebView 销毁前主动冲刷（审查 H-13）
   // 保存 unlisten，避免组件重复挂载时监听器累积（审查 M-2）
@@ -319,22 +288,8 @@ onMounted(() => {
 
 <template>
   <div class="notes-module -m-4 md:-m-6 h-full flex flex-col">
-    <!-- 模块切换：笔记 / 好句（记好句已并入笔记，2026-08-04） -->
-    <div class="module-tabs shrink-0 flex items-center gap-1 px-4 md:px-6 pt-3 pb-2 border-b border-border">
-      <button
-        class="module-tab px-3 py-1.5 text-sm rounded-lg cursor-pointer"
-        :class="activeTab === 'notes' ? 'module-tab-active' : ''"
-        @click="activeTab = 'notes'"
-      >{{ t('notes.tabNotes') }}</button>
-      <button
-        class="module-tab px-3 py-1.5 text-sm rounded-lg cursor-pointer"
-        :class="activeTab === 'quotes' ? 'module-tab-active' : ''"
-        @click="activeTab = 'quotes'"
-      >{{ t('notes.tabQuotes') }}</button>
-    </div>
-
     <!-- 笔记面板 -->
-    <div v-show="activeTab === 'notes'" class="notes-page flex-1 min-h-0 grid grid-cols-1 md:grid-cols-[260px_1fr] lg:grid-cols-[300px_1fr] gap-5 p-4 md:p-6">
+    <div class="notes-page flex-1 min-h-0 grid grid-cols-1 md:grid-cols-[260px_1fr] lg:grid-cols-[300px_1fr] gap-5 p-4 md:p-6">
     <!-- IndexedDB 不可用时的降级提示（审查 H-8），避免无限白屏 -->
     <div
       v-if="store.loadError"
@@ -355,22 +310,23 @@ onMounted(() => {
               :placeholder="t('notes.searchPlaceholder')"
               class="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-fg-faint"
             />
-            <button
-              v-if="search"
-              @click="search = ''"
-              class="clear-btn text-fg-faint hover:text-fg text-xs shrink-0 cursor-pointer"
-              :aria-label="t('notes.clearSearch')"
-            >✕</button>
-          </div>
           <button
-            @click="newNote"
+            v-if="search"
+            @click="search = ''"
+            class="clear-btn text-fg-faint hover:text-fg text-xs shrink-0 cursor-pointer"
+            :aria-label="t('notes.clearSearch')"
+          >✕</button>
+        </div>
+          <!-- 新建笔记按钮（PC 图标；移动端由右下角 FAB 唤起同一动作） -->
+          <button
+            @click="primaryCreate"
             class="new-btn w-9 h-9 flex items-center justify-center shrink-0 cursor-pointer"
             :title="t('notes.newNote')"
             :aria-label="t('notes.newNote')"
           >
             <span class="i-carbon-add text-lg leading-none" />
           </button>
-        </div>
+      </div>
 
         <!-- 文件夹栏（搜索时隐藏，搜索是全库范围） -->
         <div v-if="!searching" class="flex flex-wrap gap-1.5 items-center">
@@ -576,64 +532,11 @@ onMounted(() => {
             <span class="i-carbon-document text-2xl text-white" />
           </span>
           <h3 class="font-semibold m-0 mb-1.5">{{ t('notes.emptyTitle') }}</h3>
-          <p class="text-sm text-fg-faint m-0 leading-relaxed" v-html="t('notes.emptyHint')" />
+          <p class="text-sm text-fg-faint m-0 leading-relaxed">{{ t('notes.emptyHint') }}</p>
+          <p class="text-xs text-fg-faint opacity-80 m-0 mt-1 leading-relaxed">{{ t('notes.emptyHintSub') }}</p>
         </div>
       </div>
     </section>
-    </div>
-
-    <!-- 好句面板（复用 quotes store，记好句已并入笔记） -->
-    <div v-show="activeTab === 'quotes'" class="quotes-pane flex-1 min-h-0 overflow-auto p-4 md:p-6">
-      <div class="max-w-2xl mx-auto space-y-4">
-        <div class="flex items-center justify-between">
-          <h2 class="text-xl font-bold m-0">{{ t('notes.tabQuotes') }}</h2>
-          <button class="btn-primary px-3 py-1.5 text-sm rounded-btn flex items-center gap-1.5" @click="showQuoteForm = !showQuoteForm">
-            <span class="i-carbon-add text-base" />{{ t('quote.add') }}
-          </button>
-        </div>
-
-        <!-- 内联添加表单 -->
-        <section v-if="showQuoteForm" class="rounded-2xl p-5 space-y-3 bg-bg border border-brand/20">
-          <label class="block">
-            <span class="text-xs text-fg-soft">{{ t('quote.text') }}</span>
-            <textarea ref="qInput" v-model="qText" rows="3" :placeholder="t('quote.textPlaceholder')" class="input-modern mt-1 w-full resize-none"></textarea>
-          </label>
-          <div class="flex items-end gap-3">
-            <label class="block flex-1">
-              <span class="text-xs text-fg-soft">{{ t('quote.category') }}</span>
-              <input v-model="qCategory" type="text" list="quote-cats" :placeholder="t('quote.categoryPlaceholder')" class="input-modern mt-1 w-full" />
-              <datalist id="quote-cats">
-                <option v-for="c in QUOTE_CATEGORIES" :key="c" :value="c" />
-              </datalist>
-            </label>
-            <label class="block">
-              <span class="text-xs text-fg-soft">{{ t('quote.date') }}</span>
-              <input v-model="qDate" type="date" class="input-modern mt-1" />
-            </label>
-          </div>
-          <div class="flex items-center gap-2 justify-end">
-            <button class="q-cancel px-4 py-2 text-sm" @click="showQuoteForm = false">{{ t('quote.cancel') }}</button>
-            <button class="btn-primary px-4 py-2 text-sm" @click="addQuote">{{ t('quote.save') }}</button>
-          </div>
-        </section>
-
-        <!-- 好句列表 -->
-        <div v-if="quotes.list.length" class="space-y-3">
-          <div v-for="q in quotes.list" :key="q.id" class="quote-card rounded-2xl p-5">
-            <div class="flex items-start justify-between gap-3">
-              <div class="text-[11px] text-fg-faint tracking-wide">
-                <span v-if="q.category">{{ q.category }} · </span>{{ q.date }}
-              </div>
-              <button
-                class="text-[11px] text-fg-faint hover:text-red-500 bg-transparent border-none cursor-pointer shrink-0"
-                @click="delQuote(q.id)"
-              >{{ t('common.delete') }}</button>
-            </div>
-            <p class="quote-text mt-2 mb-0 leading-relaxed">{{ q.text }}</p>
-          </div>
-        </div>
-        <p v-else class="text-sm text-fg-faint m-0">{{ t('quote.empty') }}</p>
-      </div>
     </div>
   </div>
 </template>
@@ -659,16 +562,16 @@ onMounted(() => {
 .search-box:focus-within { border-color: var(--c-brand); }
 .clear-btn { background: transparent; border: none; }
 
-/* 新建按钮：与搜索框同高同圆角，无位移动效避免与边线挤压 */
+/* 新建笔记按钮：扁平品牌渐变，无阴影（与全局按钮风格一致） */
 .new-btn {
   background: var(--c-brand-grad);
   color: #fff;
   border: none;
   border-radius: var(--radius);
-  transition: opacity 0.15s ease, box-shadow 0.15s ease;
+  transition: opacity 0.15s ease;
 }
-.new-btn:hover { opacity: 0.9; box-shadow: 0 3px 10px var(--c-brand-soft); }
-.new-btn:active { opacity: 0.8; }
+.new-btn:hover { opacity: 0.88; }
+.new-btn:active { opacity: 0.78; }
 
 /* 文件夹 chips */
 .folder-chip {
@@ -856,32 +759,4 @@ onMounted(() => {
 .markdown-body :deep(table) { border-collapse: collapse; width: 100%; margin: 0.8em 0; }
 .markdown-body :deep(th), .markdown-body :deep(td) { border: 1px solid var(--c-border); padding: 6px 10px; text-align: left; }
 
-/* 模块切换标签（笔记 / 好句） */
-.module-tab { color: var(--c-fg-soft); transition: color 0.15s ease, background-color 0.15s ease; }
-.module-tab:hover { color: var(--c-fg); }
-.module-tab-active {
-  background: var(--c-brand-soft);
-  color: var(--c-brand-strong);
-  font-weight: 600;
-}
-.dark .module-tab-active { color: var(--c-brand); }
-
-/* 好句卡片 */
-.quote-card {
-  background: var(--c-surface);
-  border: 1px solid var(--c-border);
-  border-left: 3px solid var(--c-brand);
-}
-.quote-text { font-size: 1rem; color: var(--c-fg); }
-
-/* 好句表单取消按钮 */
-.q-cancel {
-  background: var(--c-surface);
-  border: 1px solid var(--c-border);
-  color: var(--c-fg-soft);
-  border-radius: var(--radius);
-  cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
-}
-.q-cancel:hover { color: var(--c-fg); border-color: var(--c-brand); background: var(--c-surface-hover); }
 </style>

@@ -12,11 +12,14 @@ import { useQuotesStore } from '@/stores/quotes'
 import { useConfirm } from '@/composables/useConfirm'
 import { useToast } from '@/composables/useToast'
 import { exportToFile, readBackupFile, importBackup, type ImportMode } from '@/services/backup'
+import { hasSecureKeyStorage } from '@/services/tauri'
 import { appLogoDataUri } from '@/assets/logo'
 import { SUPPORTED_LOCALES } from '@/i18n'
 
 const { theme, setTheme } = useTheme()
 const settings = useSettingsStore()
+/** 桌面端是否经系统凭据库保管密钥（审查 R-1） */
+const secureKey = hasSecureKeyStorage()
 const noteStore = useNoteStore()
 const todoStore = useTodoStore()
 const ledgerStore = useLedgerStore()
@@ -89,7 +92,7 @@ async function onFileChosen(e: Event) {
     // 导入后主动刷新内存态，避免 UI 继续显示旧数据（审查 H-15 / M-45）
     try {
       await noteStore.reload()
-      todoStore.reload()
+      await todoStore.reload()
       await ledgerStore.load()
       await fitnessStore.load()
       await anniversariesStore.load()
@@ -270,14 +273,18 @@ const locales = SUPPORTED_LOCALES
           class="input-modern w-full px-3 py-2 text-sm"
           placeholder="sk-..."
         />
-        <label class="flex items-center gap-2 text-xs text-fg-soft mt-2 cursor-pointer select-none">
+        <label v-if="!secureKey" class="flex items-center gap-2 text-xs text-fg-soft mt-2 cursor-pointer select-none">
           <input v-model="settings.aiKeyRemember" type="checkbox" class="cursor-pointer" />
           {{ t('settings.rememberKey') }}
         </label>
-        <p class="field-hint">
-          {{ t('settings.keyHint') }}
+        <p v-if="secureKey" class="mt-2 text-xs leading-relaxed rounded-lg bg-emerald-500/10 text-emerald-500 px-3 py-2">
+          <span class="i-carbon-locked mr-1 align-middle" />
+          {{ t('settings.keySecureHint') }}
         </p>
-        <p class="key-warning mt-2 rounded-lg px-3 py-2 text-[11px] leading-relaxed">
+        <p class="field-hint">
+          {{ t(secureKey ? 'settings.keySecureDesc' : 'settings.keyHint') }}
+        </p>
+        <p v-if="!secureKey" class="key-warning mt-2 rounded-lg px-3 py-2 text-[11px] leading-relaxed">
           <span class="i-carbon-warning-alt mr-1 align-middle" />
           {{ t('settings.keyWarning') }}
         </p>
@@ -322,10 +329,15 @@ const locales = SUPPORTED_LOCALES
       </p>
     </section>
 
-    <!-- 快捷键 -->
-    <section class="setting-card rounded-2xl p-5">
+    <!-- 快捷键（桌面端专属；移动端无快捷键需求，隐藏） -->
+    <section class="setting-card rounded-2xl p-5 hidden lg:block">
       <div class="font-semibold text-sm mb-1">{{ t('settings.shortcutTitle') }}</div>
-      <p class="text-xs text-fg-faint mt-0 mb-4">{{ t('settings.shortcutHint') }}</p>
+      <p class="text-xs text-fg-faint mt-0 mb-3">{{ t('settings.shortcutHint') }}</p>
+      <label class="flex items-center gap-2 text-sm text-fg-soft cursor-pointer select-none mb-3">
+        <input v-model="settings.shortcutsEnabled" type="checkbox" class="cursor-pointer" />
+        {{ t('settings.shortcutEnable') }}
+      </label>
+      <p v-if="!settings.shortcutsEnabled" class="text-xs text-fg-faint mt-0 mb-3">{{ t('settings.shortcutEnableHint') }}</p>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <div v-for="s in shortcuts" :key="s.descKey" class="flex items-center justify-between px-3 py-2 rounded-xl kbd-row">
           <span class="text-sm text-fg-soft">{{ t(s.descKey) }}</span>
@@ -390,7 +402,7 @@ const locales = SUPPORTED_LOCALES
 
 /* 数据管理按钮 */
 .data-btn {
-  background: var(--c-bg);
+  background: var(--c-surface);
   border: 1px solid var(--c-border);
   color: var(--c-fg-soft);
   cursor: pointer;
@@ -399,6 +411,9 @@ const locales = SUPPORTED_LOCALES
 .data-btn:hover:not(:disabled) {
   color: var(--c-fg);
   border-color: var(--c-brand);
+  background: var(--c-brand-soft);
+}
+.data-btn:active:not(:disabled) {
   background: var(--c-brand-soft);
 }
 .data-btn-danger:hover:not(:disabled) {
@@ -412,7 +427,7 @@ const locales = SUPPORTED_LOCALES
   border-color: #f8716655;
   background: #f871661a;
 }
-.data-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.data-btn:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
 
 .msg-ok { color: var(--c-brand-strong); }
 .dark .msg-ok { color: var(--c-brand); }

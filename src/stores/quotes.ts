@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { quoteStorage } from '@/services/storage'
+import { quoteRepository as quoteStorage } from '@/db'
 import type { Quote } from '@/types'
 
 /** 预设分类，用户也可在表单中自定义 */
