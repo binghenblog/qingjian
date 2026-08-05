@@ -1,0 +1,5 @@
+# 允许前端调用 load-api-key 命令，从系统凭据库读取 API Key（审查 R-1）。
+[[permission]]
+identifier = "load-api-key"
+description = "允许从系统凭据库读取 API Key。"
+commands.allow = ["load-api-key"]

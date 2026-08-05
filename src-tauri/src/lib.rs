@@ -11,6 +11,76 @@ use std::sync::{Arc, Mutex};
 use tauri::ipc::Channel;
 use tauri::State;
 
+/// 密钥安全托管（审查 R-1）：桌面端把 API Key 存进系统凭据库
+/// （Windows Credential Manager / macOS Keychain / Linux Secret Service+keyutils），
+/// `ai-chat` 不再接收前端明文 Key，直接由本模块从凭据库读取。
+/// 移动端（Android/iOS）不编译 keyring（见 Cargo.toml 平台限定依赖），
+/// 命令返回「平台不支持」，由前端回退到直传明文（现状，无系统凭据库可用）。
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+mod secure_key {
+    use keyring::Entry;
+
+    const SERVICE: &str = "com.qingjian.app";
+    const USER: &str = "qingjian";
+
+    pub fn store(key: &str) -> Result<(), String> {
+        Entry::new(SERVICE, USER)
+            .map_err(|e| e.to_string())?
+            .set_password(key)
+            .map_err(|e| e.to_string())
+    }
+
+    pub fn load() -> Result<Option<String>, String> {
+        let entry = Entry::new(SERVICE, USER).map_err(|e| e.to_string())?;
+        match entry.get_password() {
+            Ok(k) => Ok(Some(k)),
+            Err(keyring::Error::NoEntry) => Ok(None),
+            Err(e) => Err(e.to_string()),
+        }
+    }
+
+    pub fn delete() -> Result<(), String> {
+        let entry = Entry::new(SERVICE, USER).map_err(|e| e.to_string())?;
+        match entry.delete_credential() {
+            Ok(_) => Ok(()),
+            Err(keyring::Error::NoEntry) => Ok(()),
+            Err(e) => Err(e.to_string()),
+        }
+    }
+}
+
+/// 移动端回退实现：系统凭据库不可用，命令恒报「平台不支持」，前端据此走直传路径。
+#[cfg(any(target_os = "android", target_os = "ios"))]
+mod secure_key {
+    pub fn store(_key: &str) -> Result<(), String> {
+        Err("当前平台不支持系统凭据库".into())
+    }
+    pub fn load() -> Result<Option<String>, String> {
+        Ok(None)
+    }
+    pub fn delete() -> Result<(), String> {
+        Ok(())
+    }
+}
+
+/// 保存 API Key 到系统凭据库（审查 R-1）。前端设置页在桌面端调用。
+#[tauri::command(rename = "store-api-key")]
+fn store_api_key(key: String) -> Result<(), String> {
+    secure_key::store(&key)
+}
+
+/// 从系统凭据库读取 API Key（审查 R-1）。
+#[tauri::command(rename = "load-api-key")]
+fn load_api_key() -> Result<Option<String>, String> {
+    secure_key::load()
+}
+
+/// 删除系统凭据库中的 API Key（审查 R-1）。
+#[tauri::command(rename = "delete-api-key")]
+fn delete_api_key() -> Result<(), String> {
+    secure_key::delete()
+}
+
 #[derive(Deserialize)]
 struct AiConfig {
     base_url: String,
@@ -133,9 +203,9 @@ async fn safe_url(raw: &str) -> Result<String, String> {
 /// 由 Rust 后端发起请求，密钥经前端传入但仅驻留内存、规避 WebView CSP / CORS 限制；
 /// 通过 `Channel` 把每个 token 推回前端，保持流式体验。
 ///
-/// ⚠️ 安全（审查 H-2 / H-6 残留）：Web 端密钥当前仍以明文存在于前端内存；桌面端最终应由
-/// Rust 安全存储（keyring / 平台凭据库）保管，调用 `ai_chat` 时不经前端传递明文 Key。
-/// 本报告将「密钥不进入前端 JS」的措辞修正为上述现状，避免不实承诺。
+/// ⚠️ 安全（审查 R-1，v0.5.1 起）：桌面端密钥已由 `secure_key` 模块从系统凭据库读取，
+/// **不再信任前端传入的明文 Key**（`config.api_key` 在桌面端被忽略，杜绝 XSS 窃取后伪冒）。
+/// 移动端（Android/iOS）无系统凭据库接入，回退到前端直传（现状）。
 #[tauri::command(rename = "ai-chat")]
 async fn ai_chat(
     config: AiConfig,
@@ -159,12 +229,22 @@ async fn ai_chat(
         format!("{}/chat/completions", base)
     };
 
+    // 桌面端：密钥从系统凭据库读取；移动端：回退到前端直传（审查 R-1）
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    let api_key: Option<String> = {
+        // 显式引用前端传入字段以保持命令签名与移动端一致，但**不信任其值**（R-1）
+        let _frontend_key = &config.api_key;
+        secure_key::load().ok().flatten()
+    };
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    let api_key: Option<String> = config.api_key.clone();
+
     let mut headers = reqwest::header::HeaderMap::new();
     headers.insert(
         reqwest::header::CONTENT_TYPE,
         reqwest::header::HeaderValue::from_static("application/json"),
     );
-    if let Some(key) = &config.api_key {
+    if let Some(key) = &api_key {
         if !key.trim().is_empty() {
             let val = format!("Bearer {}", key);
             headers.insert(
@@ -298,7 +378,13 @@ pub fn run() {
         .manage(AiState {
             cancel: Mutex::new(HashMap::new()),
         })
-        .invoke_handler(tauri::generate_handler![ai_chat, cancel_ai_chat])
+        .invoke_handler(tauri::generate_handler![
+            ai_chat,
+            cancel_ai_chat,
+            store_api_key,
+            load_api_key,
+            delete_api_key
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

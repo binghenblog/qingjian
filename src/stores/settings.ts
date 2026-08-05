@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import i18n from '@/i18n'
+import { hasSecureKeyStorage, storeApiKey, loadApiKey, deleteApiKey } from '@/services/tauri'
 
 export type AIProviderType = 'local' | 'cloud'
 
@@ -22,6 +23,8 @@ interface SettingsState {
   showAiEntry: boolean
   /** 首页 Hero 横幅是否被收起（true=已收起不显示；设置页「恢复横幅」置回 false） */
   dashboardHeroHidden: boolean
+  /** 是否启用全局快捷键（Alt+1~5 / Ctrl+K / Ctrl+N；默认关闭，由设置页开关控制） */
+  shortcutsEnabled: boolean
 }
 
 function load(): SettingsState {
@@ -34,7 +37,8 @@ function load(): SettingsState {
     locale: 'zh-CN',
     ledgerShowSummary: false,
     showAiEntry: false,
-    dashboardHeroHidden: false
+    dashboardHeroHidden: false,
+    shortcutsEnabled: false
   }
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -86,8 +90,10 @@ function persistKey(key: string, remember: boolean) {
 
 /**
  * 设置 Store。
- * 安全（审查 C-4）：API Key 不进主设置 JSON；默认仅存 sessionStorage（关闭浏览器即清除），
- * 用户显式开启「记住密钥」才写入 localStorage。桌面版将改为 Rust 后端加密保管。
+ * 安全（审查 C-4 / R-1）：API Key 不进主设置 JSON；
+ * - 桌面端（Tauri 且非移动）：经系统凭据库加密保管（store-api-key / load-api-key / delete-api-key），
+ *   不再落浏览器存储；
+ * - Web / 移动端：默认仅存 sessionStorage（关闭浏览器即清除），用户显式开启「记住密钥」才写入 localStorage。
  */
 export const useSettingsStore = defineStore('settings', () => {
   const s = load()
@@ -96,11 +102,44 @@ export const useSettingsStore = defineStore('settings', () => {
   const aiBaseUrl = ref(s.aiBaseUrl)
   const aiModel = ref(s.aiModel)
   const aiKeyRemember = ref(s.aiKeyRemember)
-  const aiApiKey = ref(loadKey(s.aiKeyRemember))
+  // 桌面端 Key 异步从系统凭据库读取（store 创建后立即发起，设置页打开前通常已就绪）；
+  // Web/移动端同步读浏览器存储。
+  const aiApiKey = ref('')
   const locale = ref(s.locale)
   const ledgerShowSummary = ref(s.ledgerShowSummary)
   const showAiEntry = ref(s.showAiEntry)
   const dashboardHeroHidden = ref(s.dashboardHeroHidden)
+  const shortcutsEnabled = ref(s.shortcutsEnabled)
+
+  const secure = hasSecureKeyStorage()
+  if (secure) {
+    loadApiKey()
+      .then((k) => {
+        if (k) {
+          aiApiKey.value = k
+          return
+        }
+        // 迁移（审查 R-1）：旧版明文 Key 若残留在浏览器存储，迁入系统凭据库后清除。
+        // 「记住」开关旧值仅决定从哪读，两处都检查以覆盖历史版本。
+        const legacy = loadKey(true) || loadKey(false)
+        if (legacy) {
+          storeApiKey(legacy)
+            .then(() => {
+              aiApiKey.value = legacy
+              try {
+                localStorage.removeItem(KEY_STORAGE)
+                sessionStorage.removeItem(KEY_STORAGE)
+              } catch {
+                /* ignore */
+              }
+            })
+            .catch(() => {})
+        }
+      })
+      .catch(() => {})
+  } else {
+    aiApiKey.value = loadKey(s.aiKeyRemember)
+  }
 
   // 语言切换：写入 i18n 全局 locale，界面即时更新（审查 L-38）
   watch(locale, (code) => {
@@ -122,7 +161,8 @@ export const useSettingsStore = defineStore('settings', () => {
           locale: locale.value,
           ledgerShowSummary: ledgerShowSummary.value,
           showAiEntry: showAiEntry.value,
-          dashboardHeroHidden: dashboardHeroHidden.value
+          dashboardHeroHidden: dashboardHeroHidden.value,
+          shortcutsEnabled: shortcutsEnabled.value
         })
       )
     } catch {
@@ -138,13 +178,21 @@ export const useSettingsStore = defineStore('settings', () => {
   if (typeof window !== 'undefined') {
     window.addEventListener('beforeunload', flush)
   }
-  watch([userName, aiProvider, aiBaseUrl, aiModel, aiKeyRemember, locale, ledgerShowSummary, showAiEntry, dashboardHeroHidden], () => {
+  watch([userName, aiProvider, aiBaseUrl, aiModel, aiKeyRemember, locale, ledgerShowSummary, showAiEntry, dashboardHeroHidden, shortcutsEnabled], () => {
     clearTimeout(settingsTimer)
     settingsTimer = window.setTimeout(persistNow, 200)
   })
 
-  // Key 单独持久化，跟随「记住」开关迁移存储位置
-  watch([aiApiKey, aiKeyRemember], () => persistKey(aiApiKey.value, aiKeyRemember.value))
+  // Key 持久化：桌面端 → 系统凭据库；Web/移动端 → 浏览器存储（跟随「记住」开关迁移存储位置）
+  watch([aiApiKey, aiKeyRemember], () => {
+    if (secure) {
+      const key = aiApiKey.value
+      if (key) storeApiKey(key).catch(() => {})
+      else deleteApiKey().catch(() => {})
+    } else {
+      persistKey(aiApiKey.value, aiKeyRemember.value)
+    }
+  })
 
-  return { userName, aiProvider, aiBaseUrl, aiApiKey, aiModel, aiKeyRemember, locale, ledgerShowSummary, showAiEntry, dashboardHeroHidden, flush }
+  return { userName, aiProvider, aiBaseUrl, aiApiKey, aiModel, aiKeyRemember, locale, ledgerShowSummary, showAiEntry, dashboardHeroHidden, shortcutsEnabled, flush }
 })

@@ -1,0 +1,5 @@
+# 允许前端调用 store-api-key 命令，将 API Key 保存到系统凭据库（审查 R-1）。
+[[permission]]
+identifier = "store-api-key"
+description = "允许将 API Key 保存到系统凭据库（Windows Credential Manager / macOS Keychain / Linux Secret Service）。"
+commands.allow = ["store-api-key"]

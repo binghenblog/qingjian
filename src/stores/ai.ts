@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
-import { chatStorage } from '@/services/storage'
+import { chatRepository as chatStorage } from '@/db'
 import { createProvider, type ChatMessage, type AIConfig } from '@/services/ai'
 import { useSettingsStore } from '@/stores/settings'
 import { useToast } from '@/composables/useToast'

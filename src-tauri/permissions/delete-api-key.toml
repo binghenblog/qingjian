@@ -1,0 +1,5 @@
+# 允许前端调用 delete-api-key 命令，删除系统凭据库中的 API Key（审查 R-1）。
+[[permission]]
+identifier = "delete-api-key"
+description = "允许删除系统凭据库中的 API Key。"
+commands.allow = ["delete-api-key"]

@@ -18,6 +18,38 @@ export function isTauri(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 }
 
+/** 是否在 Tauri 移动端（Android / iOS）运行时内：无系统凭据库接入，密钥只能直传（审查 R-1） */
+export function isTauriMobile(): boolean {
+  if (!isTauri()) return false
+  return /Android|iPhone|iPad|iPod/i.test(typeof navigator !== 'undefined' ? navigator.userAgent : '')
+}
+
+/**
+ * 桌面端是否启用系统凭据库保管密钥（审查 R-1）。
+ * 桌面 Tauri：是；Web / 移动端：否（回退到浏览器存储 / 直传）。
+ */
+export function hasSecureKeyStorage(): boolean {
+  return isTauri() && !isTauriMobile()
+}
+
+/** 把 API Key 保存到系统凭据库（桌面端，审查 R-1） */
+export async function storeApiKey(key: string): Promise<void> {
+  const core = await import('@tauri-apps/api/core')
+  await core.invoke('store-api-key', { key })
+}
+
+/** 从系统凭据库读取 API Key；不存在返回 null（桌面端，审查 R-1） */
+export async function loadApiKey(): Promise<string | null> {
+  const core = await import('@tauri-apps/api/core')
+  return await core.invoke('load-api-key')
+}
+
+/** 删除系统凭据库中的 API Key（桌面端，审查 R-1） */
+export async function deleteApiKey(): Promise<void> {
+  const core = await import('@tauri-apps/api/core')
+  await core.invoke('delete-api-key')
+}
+
 export class TauriCloudProvider implements AIProvider {
   id = 'tauri-cloud'
   name = '云端（桌面端中转）'
@@ -73,7 +105,13 @@ async function* tauriChat(
   }
 
   const invokeP = core.invoke('ai-chat', {
-    config: { base_url: cfg.baseUrl, api_key: cfg.apiKey, model: cfg.model },
+    config: {
+      base_url: cfg.baseUrl,
+      // 桌面端不再传递明文 Key：Rust 后端从系统凭据库读取（审查 R-1）；
+      // 移动端无凭据库，仍需直传（回退路径）。
+      api_key: isTauriMobile() ? cfg.apiKey : undefined,
+      model: cfg.model
+    },
     messages: messages.map((m) => ({ role: m.role as ChatRole, content: m.content })),
     request_id: requestId,
     on_token: channel

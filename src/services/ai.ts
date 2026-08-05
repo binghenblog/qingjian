@@ -27,9 +27,13 @@ export interface AIProvider {
 
 /**
  * 通用流式行读取（审查 M-4：ndjson 与 SSE 共用一套按行切分逻辑）。
- * 逐行产出去除首尾空白后的非空行。
+ * 逐行产出去除首尾空白后的非空行。onChunk 在每次收到新数据块时调用，
+ * 供调用方重置「空闲读超时」计时器（审查 M-1）。
  */
-async function* readLines(body: ReadableStream<Uint8Array>): AsyncGenerator<string> {
+async function* readLines(
+  body: ReadableStream<Uint8Array>,
+  onChunk?: () => void
+): AsyncGenerator<string> {
   const reader = body.getReader()
   const decoder = new TextDecoder()
   let buf = ''
@@ -37,6 +41,7 @@ async function* readLines(body: ReadableStream<Uint8Array>): AsyncGenerator<stri
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
+      onChunk?.()
       buf += decoder.decode(value, { stream: true })
       let idx: number
       while ((idx = buf.indexOf('\n')) >= 0) {
@@ -54,19 +59,28 @@ async function* readLines(body: ReadableStream<Uint8Array>): AsyncGenerator<stri
 }
 
 /**
- * 为请求信号附加总超时，避免 Web 模式无响应时永久挂起（审查 M-7）。
+ * 为请求信号附加「空闲读」超时，避免 Web 模式无响应时永久挂起（审查 M-1，替代旧 120s 硬总超时）。
+ * 语义与 Rust 中转端一致：不设整体时长上限（超长回复不被截断），仅在**超过 idleMs 未收到任何数据**
+ * 时中止。调用方须在每次收到新数据块时调用 reset() 重置计时器。
  * 若调用方已提供 signal（用户中止），两者任一触发即中止。
  */
-function withTimeout(signal?: AbortSignal, ms = 120_000): AbortSignal {
+function withIdleTimeout(
+  signal?: AbortSignal,
+  idleMs = 60_000
+): { signal: AbortSignal; reset: () => void } {
   const ctrl = new AbortController()
-  const timer = setTimeout(() => ctrl.abort(), ms)
-  const clear = () => clearTimeout(timer)
-  ctrl.signal.addEventListener('abort', clear, { once: true })
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const reset = () => {
+    clearTimeout(timer)
+    timer = setTimeout(() => ctrl.abort(), idleMs)
+  }
+  reset()
+  ctrl.signal.addEventListener('abort', () => clearTimeout(timer), { once: true })
   if (signal) {
     if (signal.aborted) ctrl.abort()
     else signal.addEventListener('abort', () => ctrl.abort(), { once: true })
   }
-  return ctrl.signal
+  return { signal: ctrl.signal, reset }
 }
 
 /** 云端模式拦截的受限内部地址（审查 M-23 SSRF 防护，主要防云元数据凭证窃取） */
@@ -164,14 +178,16 @@ export class OllamaProvider implements AIProvider {
 
   async *chat(messages: ChatMessage[], signal?: AbortSignal): AsyncGenerator<string> {
     const base = assertSafeUrl(this.cfg.baseUrl, 'local')
+    // 空闲读超时（审查 M-1）：60s 无新数据才中止，不设总时长，超长回复不被截断
+    const { signal: s, reset } = withIdleTimeout(signal)
     const res = await fetch(`${base}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: this.cfg.model, messages, stream: true }),
-      signal: withTimeout(signal)
+      signal: s
     })
     if (!res.ok || !res.body) throw new Error(le('errors.ollamaConnect', { status: res.status }))
-    for await (const line of readLines(res.body)) {
+    for await (const line of readLines(res.body, reset)) {
       try {
         const obj = JSON.parse(line)
         if (obj.message?.content) yield obj.message.content as string
@@ -209,11 +225,13 @@ export class CloudProvider implements AIProvider {
     const key = this.cfg.apiKey?.trim()
     if (key) headers.Authorization = `Bearer ${key}`
 
+    // 空闲读超时（审查 M-1）：60s 无新数据才中止，不设总时长，超长回复不被截断
+    const { signal: s, reset } = withIdleTimeout(signal)
     const res = await fetch(url, {
       method: 'POST',
       headers,
       body: JSON.stringify({ model: this.cfg.model, messages, stream: true }),
-      signal: withTimeout(signal)
+      signal: s
     })
     if (!res.ok || !res.body) {
       const txt = await res.text().catch(() => '')
@@ -222,7 +240,7 @@ export class CloudProvider implements AIProvider {
       if (res.status === 429) throw new Error(le('errors.cloudRateLimited'))
       throw new Error(le('errors.cloudFailed', { status: res.status, detail: txt ? ': ' + txt.slice(0, 200) : '' }))
     }
-    for await (const line of readLines(res.body)) {
+    for await (const line of readLines(res.body, reset)) {
       if (!line.startsWith('data:')) continue
       const data = line.slice(5).trim()
       if (data === '[DONE]') return

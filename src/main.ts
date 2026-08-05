@@ -1,8 +1,9 @@
 import { createApp } from 'vue'
-import { createPinia } from 'pinia'
+import { createPinia, setActivePinia } from 'pinia'
 import App from './App.vue'
 import { router } from './router'
 import i18n from './i18n'
+import { useTodoStore } from './stores/todos'
 import 'uno.css'
 import './styles/theme.css'
 
@@ -19,17 +20,32 @@ function showErrorBanner(msg: string) {
   document.body.appendChild(el)
 }
 
-const app = createApp(App)
+async function bootstrap() {
+  const app = createApp(App)
+  const pinia = createPinia()
+  app.use(pinia)
+  setActivePinia(pinia)
 
-app.config.errorHandler = (err, _instance, info) => {
-  console.error('[Vue error]', err, info)
-  showErrorBanner(err instanceof Error ? err.message : String(err))
+  // 预加载待办（数据访问层为异步 IndexedDB），确保首屏 Dashboard / 命令面板
+  // 在组件挂载前即可读到数据，避免闪空。失败不阻塞启动（store 内已兜底）。
+  try {
+    await useTodoStore().load()
+  } catch {
+    /* 已由 store 记录 loadError，UI 可降级提示 */
+  }
+
+  app.config.errorHandler = (err, _instance, info) => {
+    console.error('[Vue error]', err, info)
+    showErrorBanner(err instanceof Error ? err.message : String(err))
+  }
+
+  window.addEventListener('unhandledrejection', (e) => {
+    const reason = e.reason
+    console.error('[unhandledrejection]', reason)
+    showErrorBanner(reason instanceof Error ? reason.message : String(reason))
+  })
+
+  app.use(router).use(i18n).mount('#app')
 }
 
-window.addEventListener('unhandledrejection', (e) => {
-  const reason = e.reason
-  console.error('[unhandledrejection]', reason)
-  showErrorBanner(reason instanceof Error ? reason.message : String(reason))
-})
-
-app.use(createPinia()).use(router).use(i18n).mount('#app')
+bootstrap()
