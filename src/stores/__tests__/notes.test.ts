@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useNoteStore } from '../notes'
-import { storage } from '@/services/storage'
+import { noteRepository } from '@/db'
 
 function freshStore() {
   setActivePinia(createPinia())
@@ -10,7 +10,7 @@ function freshStore() {
 
 beforeEach(async () => {
   localStorage.clear()
-  await storage.replaceAllNotes([])
+  await noteRepository.replaceAll([])
 })
 
 afterEach(() => {
@@ -65,7 +65,7 @@ describe('update 失败回滚（H-4）', () => {
     const n = await store.create()
     await store.update(n.id, { title: '原标题', content: '原内容' })
 
-    vi.spyOn(storage, 'saveNote').mockRejectedValueOnce(new Error('磁盘炸了'))
+    vi.spyOn(noteRepository, 'save').mockRejectedValueOnce(new Error('磁盘炸了'))
     await expect(store.update(n.id, { title: '新标题' })).rejects.toThrow('磁盘炸了')
 
     const cur = store.notes.find((x) => x.id === n.id)!
@@ -76,7 +76,7 @@ describe('update 失败回滚（H-4）', () => {
   it('写盘成功后清除 lastError', async () => {
     const store = freshStore()
     const n = await store.create()
-    vi.spyOn(storage, 'saveNote').mockRejectedValueOnce(new Error('x'))
+    vi.spyOn(noteRepository, 'save').mockRejectedValueOnce(new Error('x'))
     await store.update(n.id, { title: 'A' }).catch(() => {})
     await store.update(n.id, { title: 'B' })
     expect(store.lastError).toBeNull()
@@ -93,7 +93,7 @@ describe('文件夹', () => {
     await store.removeFolder('工作')
     expect(store.folders).not.toContain('工作')
     expect(store.notes.find((x) => x.id === n1.id)!.folder).toBe('')
-    const persisted = await storage.listNotes()
+    const persisted = await noteRepository.list()
     expect(persisted.every((n) => n.folder === '')).toBe(true)
     expect(persisted.map((n) => n.id).sort()).toEqual([n1.id, n2.id].sort())
   })
@@ -102,7 +102,7 @@ describe('文件夹', () => {
     const store = freshStore()
     store.addFolder('工作')
     await store.create('工作')
-    vi.spyOn(storage, 'saveNotes').mockRejectedValueOnce(new Error('fail'))
+    vi.spyOn(noteRepository, 'saveMany').mockRejectedValueOnce(new Error('fail'))
     await expect(store.removeFolder('工作')).rejects.toThrow('fail')
     expect(store.folders).toContain('工作')
     expect(store.notes[0].folder).toBe('工作')

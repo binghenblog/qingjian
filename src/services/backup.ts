@@ -1,13 +1,15 @@
 import {
-  storage,
-  chatStorage,
-  transactionStorage,
-  workoutStorage,
-  weightStorage,
-  anniversaryStorage,
-  quoteStorage,
+  noteRepository,
+  chatRepository,
+  transactionRepository,
+  workoutRepository,
+  weightRepository,
+  anniversaryRepository,
+  quoteRepository,
+  todoRepository,
+  todoCategoryRepository,
   type NoteRecord
-} from './storage'
+} from '@/db'
 import type {
   TodoRecord,
   ChatSession,
@@ -18,23 +20,24 @@ import type {
   Quote
 } from '@/types'
 import { le } from '@/i18n/errors'
-import { useTodoStore } from '@/stores/todos'
+import { useTodoStore, PRESET_CATEGORIES } from '@/stores/todos'
 import { useSettingsStore } from '@/stores/settings'
 import { useAiStore } from '@/stores/ai'
 
 /**
  * 青简全量备份 / 恢复（M4）
- * - 导出：笔记（IndexedDB）+ 待办 / 分类 / 笔记文件夹 / 设置（localStorage）→ 单个 JSON 文件
+ * - 导出：笔记 / AI 会话 / 待办 / 分类 / 记账 / 健身 / 纪念日 / 记好句
+ *   均经数据访问层（IndexedDB / Dexie）→ 单个 JSON 文件；
+ *   文件夹 / 设置 / 主题仍存 localStorage，一并打包
  * - 导入：校验格式后合并或覆盖写回
  * - 安全：AI API Key 默认不导出（避免备份文件泄露密钥）
  */
 
 const BACKUP_VERSION = 2
 
-/** 参与备份的 localStorage key（不含 API Key 所在的 settings，settings 单独脱敏处理） */
+/** 参与备份的 localStorage key（不含 API Key 所在的 settings，settings 单独脱敏处理）。
+ * 待办与分类已迁入数据访问层（Dexie），不再经 localStorage，故此处不再列出。 */
 const LS_KEYS = {
-  todos: 'qingjian.todos',
-  todoCategories: 'qingjian.todo-categories',
   noteFolders: 'qingjian.note-folders',
   settings: 'qingjian.settings',
   theme: 'qj-theme'
@@ -72,19 +75,14 @@ function readJson<T>(key: string, fallback: T): T {
 
 /** 生成备份对象 */
 export async function createBackup(): Promise<BackupFile> {
-  // 导出前先 flush 内存态（绕过 200ms 防抖），避免读到尚未落盘的旧数据（审查 M-5）
+  // 导出前先 flush 设置内存态，避免读到尚未落盘的旧数据
   try {
     useSettingsStore().flush()
   } catch {
     /* ignore */
   }
-  try {
-    useTodoStore().flushNow()
-  } catch {
-    /* ignore */
-  }
 
-  const notes = await storage.listNotes()
+  const notes = await noteRepository.list()
   const settings = readJson<Record<string, unknown> | null>(LS_KEYS.settings, null)
   // 脱敏：API Key 不随备份导出（新版设置已不含 Key，此处兜底剥离旧字段）
   const safeSettings: Record<string, unknown> | null = settings
@@ -108,17 +106,17 @@ export async function createBackup(): Promise<BackupFile> {
     version: BACKUP_VERSION,
     exportedAt: Date.now(),
     notes,
-    todos: readJson<TodoRecord[]>(LS_KEYS.todos, []),
-    todoCategories: readJson<string[]>(LS_KEYS.todoCategories, []),
+    todos: await todoRepository.list(),
+    todoCategories: await todoCategoryRepository.list(),
     noteFolders: readJson<string[]>(LS_KEYS.noteFolders, []),
-    chats: await chatStorage.listChats(),
+    chats: await chatRepository.listChats(),
     settings: safeSettings,
     theme: localStorage.getItem(LS_KEYS.theme),
-    transactions: await transactionStorage.list(),
-    workouts: await workoutStorage.list(),
-    weights: await weightStorage.list(),
-    anniversaries: await anniversaryStorage.list(),
-    quotes: await quoteStorage.list()
+    transactions: await transactionRepository.list(),
+    workouts: await workoutRepository.list(),
+    weights: await weightRepository.list(),
+    anniversaries: await anniversaryRepository.list(),
+    quotes: await quoteRepository.list()
   }
 }
 
@@ -218,14 +216,14 @@ export async function importBackup(backup: BackupFile, mode: ImportMode): Promis
 
   if (mode === 'replace') {
     // 原子替换：清空 + 写入同一事务，中途失败自动回滚，不会出现「清空了却没写进去」（审查 H-5）
-    await storage.replaceAllNotes(incomingNotes)
+    await noteRepository.replaceAll(incomingNotes)
   } else {
-    const existing = new Map((await storage.listNotes()).map((n) => [n.id, n]))
+    const existing = new Map((await noteRepository.list()).map((n) => [n.id, n]))
     const toSave = incomingNotes.filter((n) => {
       const old = existing.get(n.id)
       return !old || n.updatedAt >= (old.updatedAt ?? 0)
     })
-    await storage.saveNotes(toSave)
+    await noteRepository.saveMany(toSave)
   }
 
   /* ---------- AI 会话（本地库，独立表） ---------- */
@@ -247,34 +245,25 @@ export async function importBackup(backup: BackupFile, mode: ImportMode): Promis
   })
   const incomingChats = (backup.chats ?? []).map(normalizeChat)
   if (mode === 'replace') {
-    await chatStorage.replaceAllChats(incomingChats)
+    await chatRepository.replaceAllChats(incomingChats)
   } else {
-    const existingChats = new Map((await chatStorage.listChats()).map((c) => [c.id, c]))
+    const existingChats = new Map((await chatRepository.listChats()).map((c) => [c.id, c]))
     const toSaveChats = incomingChats.filter(
       (c) => !existingChats.has(c.id) || c.updatedAt >= (existingChats.get(c.id)!.updatedAt ?? 0)
     )
-    for (const c of toSaveChats) await chatStorage.saveChat(c)
+    for (const c of toSaveChats) await chatRepository.saveChat(c)
   }
 
-  /* ---------- 待办 / 分类 / 文件夹（localStorage） ---------- */
-  const write = (key: string, v: unknown) => localStorage.setItem(key, JSON.stringify(v))
+  /* ---------- 待办 / 分类（经数据访问层） ---------- */
+  // 仅持久化「自定义分类」部分，预设分类在读取时由 DAL 补充在前（审查 M-4）
+  const customOnly = (cats: string[]): string[] => cats.filter((c) => !PRESET_CATEGORIES.includes(c))
 
   if (mode === 'replace') {
-    write(LS_KEYS.todos, backup.todos.map(sanitizeTodo))
-    write(LS_KEYS.todoCategories, backup.todoCategories ?? [])
-    write(LS_KEYS.noteFolders, backup.noteFolders ?? [])
-    if (backup.settings) {
-      const cur = readJson<Record<string, unknown> | null>(LS_KEYS.settings, null)
-      const incoming = { ...backup.settings }
-      delete incoming.aiApiKey
-      // 不覆盖用户当前的接口地址，防止恶意备份诱导重定向到攻击者服务器（审查 M-25）
-      if (cur?.aiBaseUrl) incoming.aiBaseUrl = cur.aiBaseUrl
-      write(LS_KEYS.settings, incoming)
-    }
-    if (backup.theme) localStorage.setItem(LS_KEYS.theme, backup.theme)
+    await todoRepository.replaceAll(backup.todos.map(sanitizeTodo))
+    await todoCategoryRepository.save(customOnly(backup.todoCategories ?? []))
   } else {
     // merge：按 id 合并，取时间戳较新者（与笔记 merge 对齐，审查 M-3）
-    const curTodos = readJson<TodoRecord[]>(LS_KEYS.todos, [])
+    const curTodos = await todoRepository.list()
     const byId = new Map<string, TodoRecord>(curTodos.map((t) => [t.id, t]))
     // 时间戳：取创建/完成/打卡（doneDates 最大日期）三者较新者（审查 M-6：打卡记录不再被丢弃）
     const ts = (t: TodoRecord) => {
@@ -291,13 +280,31 @@ export async function importBackup(backup: BackupFile, mode: ImportMode): Promis
       const old = byId.get(inc.id)
       if (!old || ts(inc) >= ts(old)) byId.set(inc.id, inc)
     }
-    write(LS_KEYS.todos, [...byId.values()])
+    await todoRepository.saveMany([...byId.values()])
 
+    const curCats = await todoCategoryRepository.list()
+    const mergedCats = [...new Set([...curCats, ...customOnly(backup.todoCategories ?? [])])]
+    await todoCategoryRepository.save(mergedCats)
+  }
+
+  /* ---------- 文件夹 / 设置 / 主题（仍存 localStorage） ---------- */
+  const write = (key: string, v: unknown) => localStorage.setItem(key, JSON.stringify(v))
+  if (mode === 'replace') {
+    write(LS_KEYS.noteFolders, backup.noteFolders ?? [])
+    if (backup.settings) {
+      const cur = readJson<Record<string, unknown> | null>(LS_KEYS.settings, null)
+      const incoming = { ...backup.settings }
+      delete incoming.aiApiKey
+      // 不覆盖用户当前的接口地址，防止恶意备份诱导重定向到攻击者服务器（审查 M-25）
+      if (cur?.aiBaseUrl) incoming.aiBaseUrl = cur.aiBaseUrl
+      write(LS_KEYS.settings, incoming)
+    }
+    if (backup.theme) localStorage.setItem(LS_KEYS.theme, backup.theme)
+  } else {
     const mergeList = (key: string, incoming: string[] | undefined) => {
       const cur = readJson<string[]>(key, [])
       write(key, [...new Set([...cur, ...(incoming ?? [])])])
     }
-    mergeList(LS_KEYS.todoCategories, backup.todoCategories)
     mergeList(LS_KEYS.noteFolders, backup.noteFolders)
   }
 
@@ -324,16 +331,23 @@ export async function importBackup(backup: BackupFile, mode: ImportMode): Promis
     return items.length
   }
 
-  const cntTransactions = await importTable(backup.transactions, transactionStorage)
-  const cntWorkouts = await importTable(backup.workouts, workoutStorage)
-  const cntWeights = await importTable(backup.weights, weightStorage)
-  const cntAnniversaries = await importTable(backup.anniversaries, anniversaryStorage)
-  const cntQuotes = await importTable(backup.quotes, quoteStorage)
+  const cntTransactions = await importTable(backup.transactions, transactionRepository)
+  const cntWorkouts = await importTable(backup.workouts, workoutRepository)
+  const cntWeights = await importTable(backup.weights, weightRepository)
+  const cntAnniversaries = await importTable(backup.anniversaries, anniversaryRepository)
+  const cntQuotes = await importTable(backup.quotes, quoteRepository)
 
   // 备份导入后刷新 AI 会话（审查 M-4）：ai.load() 有「已加载则早返回」且无 reload，
   // 导入的 chats 在重启前 UI 不可见；此处强制重新加载
   try {
     await useAiStore().reload()
+  } catch {
+    /* ignore */
+  }
+
+  // 待办已写入数据访问层，刷新内存态使 UI 立即反映导入结果（与笔记/AI 一致）
+  try {
+    await useTodoStore().reload()
   } catch {
     /* ignore */
   }

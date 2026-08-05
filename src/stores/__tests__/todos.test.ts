@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useTodoStore, dateKey, yesterdayKey, TODOS_VERSION } from '../todos'
+import { todoRepository, todoCategoryRepository } from '@/db'
 import { DAILY_CATEGORY } from '@/types'
 
 const STORAGE_KEY = 'qingjian.todos'
@@ -11,8 +12,10 @@ function freshStore() {
   return useTodoStore()
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   localStorage.clear()
+  await todoRepository.replaceAll([])
+  await todoCategoryRepository.clear()
 })
 
 describe('dateKey / yesterdayKey', () => {
@@ -28,8 +31,8 @@ describe('dateKey / yesterdayKey', () => {
   })
 })
 
-describe('版本化迁移（H-6）', () => {
-  it('v1 数据（无版本号）自动补 category 与 doneDates', () => {
+describe('版本化迁移（H-6 / M-4：从裸 localStorage 迁入 DAL）', () => {
+  it('v1 数据（无版本号）自动补 category 与 doneDates，并落盘到 Dexie', async () => {
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify([
@@ -38,25 +41,31 @@ describe('版本化迁移（H-6）', () => {
       ])
     )
     const store = freshStore()
+    await store.load()
     const a = store.todos.find((t) => t.id === 'a')!
     const b = store.todos.find((t) => t.id === 'b')!
     expect(a.category).toBe('生活')
     expect(b.doneDates).toEqual([])
-    expect(localStorage.getItem(VERSION_KEY)).toBe(String(TODOS_VERSION))
+    // 迁移后写入 Dexie，旧 localStorage 键被清理
+    expect(await todoRepository.get('a')).toBeTruthy()
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull()
   })
 
-  it('空库初始化直接写入当前版本号', () => {
-    freshStore()
-    expect(localStorage.getItem(VERSION_KEY)).toBe(String(TODOS_VERSION))
+  it('空库加载后内存态为空且 loaded 置位', async () => {
+    const store = freshStore()
+    await store.load()
+    expect(store.loaded).toBe(true)
+    expect(store.todos).toEqual([])
   })
 
-  it('已是当前版本的数据不重复迁移', () => {
+  it('已是当前版本的数据不重复迁移', async () => {
     localStorage.setItem(VERSION_KEY, String(TODOS_VERSION))
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify([{ id: 'x', title: 't', done: false, priority: 'low', category: '工作', createdAt: 1 }])
     )
     const store = freshStore()
+    await store.load()
     expect(store.todos[0].category).toBe('工作')
   })
 })

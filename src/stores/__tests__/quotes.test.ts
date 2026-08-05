@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useQuotesStore } from '../quotes'
-import { quoteStorage } from '@/services/storage'
+import { quoteRepository as quoteStorage } from '@/db'
 
 function ymd(d: Date): string {
   const y = d.getFullYear()

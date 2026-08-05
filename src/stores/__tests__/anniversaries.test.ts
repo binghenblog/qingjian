@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useAnniversariesStore } from '../anniversaries'
-import { anniversaryStorage } from '@/services/storage'
+import { anniversaryRepository as anniversaryStorage } from '@/db'
 
 function ymd(d: Date): string {
   const y = d.getFullYear()

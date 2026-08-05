@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { validateBackup, importBackup, createBackup, type BackupFile } from '../backup'
-import { storage, type NoteRecord } from '../storage'
+import { noteRepository, todoRepository, type NoteRecord } from '@/db'
 
 function note(id: string, patch: Partial<NoteRecord> = {}): NoteRecord {
   return {
@@ -32,7 +32,8 @@ function backup(patch: Partial<BackupFile> = {}): BackupFile {
 
 beforeEach(async () => {
   localStorage.clear()
-  await storage.replaceAllNotes([])
+  await noteRepository.replaceAll([])
+  await todoRepository.replaceAll([])
 })
 
 describe('validateBackup', () => {
@@ -58,16 +59,16 @@ describe('validateBackup', () => {
 
 describe('importBackup - replace（H-5 原子替换）', () => {
   it('清空旧数据并整体写入', async () => {
-    await storage.saveNote(note('old'))
+    await noteRepository.save(note('old'))
     await importBackup(backup({ notes: [note('n1'), note('n2')] }), 'replace')
-    const list = await storage.listNotes()
+    const list = await noteRepository.list()
     expect(list.map((n) => n.id).sort()).toEqual(['n1', 'n2'])
   })
 
   it('导入空备份等于清空', async () => {
-    await storage.saveNote(note('old'))
+    await noteRepository.save(note('old'))
     await importBackup(backup(), 'replace')
-    expect(await storage.listNotes()).toEqual([])
+    expect(await noteRepository.list()).toEqual([])
   })
 
   it('恢复设置时剥离旧版备份中的 aiApiKey', async () => {
@@ -83,15 +84,15 @@ describe('importBackup - replace（H-5 原子替换）', () => {
 
 describe('importBackup - merge', () => {
   it('同 id 保留 updatedAt 较新者', async () => {
-    await storage.saveNote(note('a', { title: '本地新', updatedAt: 100 }))
-    await storage.saveNote(note('b', { title: '本地旧', updatedAt: 10 }))
+    await noteRepository.save(note('a', { title: '本地新', updatedAt: 100 }))
+    await noteRepository.save(note('b', { title: '本地旧', updatedAt: 10 }))
     await importBackup(
       backup({
         notes: [note('a', { title: '备份旧', updatedAt: 50 }), note('b', { title: '备份新', updatedAt: 99 })]
       }),
       'merge'
     )
-    const map = new Map((await storage.listNotes()).map((n) => [n.id, n]))
+    const map = new Map((await noteRepository.list()).map((n) => [n.id, n]))
     expect(map.get('a')!.title).toBe('本地新')
     expect(map.get('b')!.title).toBe('备份新')
   })
@@ -103,37 +104,49 @@ describe('importBackup - merge', () => {
   })
 
   it('待办按 id 合并，取时间戳较新者（本地更新则本地胜）', async () => {
-    localStorage.setItem(
-      'qingjian.todos',
-      JSON.stringify([{ id: 't1', title: '本地', done: false, priority: 'medium', category: '生活', createdAt: 10 }])
-    )
+    await todoRepository.save({
+      id: 't1',
+      title: '本地',
+      done: false,
+      priority: 'medium',
+      category: '生活',
+      createdAt: 10,
+      updatedAt: 10
+    })
     await importBackup(
       backup({
         todos: [
-          { id: 't1', title: '备份旧', done: false, priority: 'medium', category: '生活', createdAt: 5 },
-          { id: 't2', title: '新增', done: false, priority: 'low', category: '工作', createdAt: 2 }
+          { id: 't1', title: '备份旧', done: false, priority: 'medium', category: '生活', createdAt: 5, updatedAt: 5 },
+          { id: 't2', title: '新增', done: false, priority: 'low', category: '工作', createdAt: 2, updatedAt: 2 }
         ] as BackupFile['todos']
       }),
       'merge'
     )
-    const merged = JSON.parse(localStorage.getItem('qingjian.todos')!)
-    expect(merged).toHaveLength(2)
-    expect(merged.find((t: { id: string }) => t.id === 't1').title).toBe('本地')
+    const list = await todoRepository.list()
+    expect(list).toHaveLength(2)
+    expect(list.find((t) => t.id === 't1')!.title).toBe('本地')
   })
 
   it('待办按 id 合并，备份较新则备份胜（审查 M-3）', async () => {
-    localStorage.setItem(
-      'qingjian.todos',
-      JSON.stringify([{ id: 't1', title: '本地旧', done: false, priority: 'medium', category: '生活', createdAt: 5 }])
-    )
+    await todoRepository.save({
+      id: 't1',
+      title: '本地旧',
+      done: false,
+      priority: 'medium',
+      category: '生活',
+      createdAt: 5,
+      updatedAt: 5
+    })
     await importBackup(
       backup({
-        todos: [{ id: 't1', title: '备份新', done: false, priority: 'medium', category: '生活', createdAt: 10 }] as BackupFile['todos']
+        todos: [
+          { id: 't1', title: '备份新', done: false, priority: 'medium', category: '生活', createdAt: 10, updatedAt: 10 }
+        ] as BackupFile['todos']
       }),
       'merge'
     )
-    const merged = JSON.parse(localStorage.getItem('qingjian.todos')!)
-    expect(merged.find((t: { id: string }) => t.id === 't1').title).toBe('备份新')
+    const list = await todoRepository.list()
+    expect(list.find((t) => t.id === 't1')!.title).toBe('备份新')
   })
 })
 
